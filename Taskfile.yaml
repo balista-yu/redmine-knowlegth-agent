@@ -1,2 +1,102 @@
-# Taskfile (https://taskfile.dev) の定義は T-0-3 で実装する。
-# このファイルは T-0-1 のリポジトリ雛形作成で空のプレースホルダとして配置されている。
+# =============================================================================
+# Redmine Knowledge Agent - Taskfile (https://taskfile.dev)
+# =============================================================================
+#
+# 前提:
+# - すべてのコマンドは Docker Compose 経由で実行 (gradle / npm をホストに不要)
+# - test / lint 系は事前に `task up` でコンテナを起動しておくこと
+#   (内部で `docker compose exec` を使うため、コンテナ未起動だとエラー)
+# - sync / reconcile / seed-redmine は host から API / Redmine を叩く
+#
+# 使い方: `task` (引数なし) で利用可能タスク一覧を表示
+# =============================================================================
+version: '3'
+
+vars:
+  COMPOSE: docker compose
+
+tasks:
+  default:
+    desc: 利用可能なタスク一覧を表示
+    cmds:
+      - task --list
+    silent: true
+
+  build:
+    desc: Docker イメージをビルド
+    cmds:
+      - "{{.COMPOSE}} build"
+
+  up:
+    desc: 全コンテナを起動 (frontend, backend, redmine, redmine-db, qdrant, app-db)
+    cmds:
+      - "{{.COMPOSE}} up -d"
+
+  down:
+    desc: 全コンテナを停止
+    cmds:
+      - "{{.COMPOSE}} down"
+
+  logs:
+    desc: 全サービスのログを追跡
+    cmds:
+      - "{{.COMPOSE}} logs -f"
+
+  logs-app:
+    desc: backend のログを追跡
+    cmds:
+      - "{{.COMPOSE}} logs -f backend"
+
+  logs-frontend:
+    desc: frontend のログを追跡
+    cmds:
+      - "{{.COMPOSE}} logs -f frontend"
+
+  test:
+    desc: backend + frontend の全テストを実行
+    cmds:
+      - task: test-be
+      - task: test-fe
+
+  test-be:
+    desc: backend のテスト (unit + integration + ArchUnit)
+    cmds:
+      - "{{.COMPOSE}} exec backend ./gradlew test"
+
+  test-fe:
+    desc: frontend のテスト (Vitest)
+    cmds:
+      - "{{.COMPOSE}} exec frontend npm test"
+
+  lint:
+    desc: backend + frontend の lint
+    cmds:
+      - task: lint-be
+      - task: lint-fe
+
+  lint-be:
+    desc: ktlint + detekt
+    cmds:
+      - "{{.COMPOSE}} exec backend ./gradlew ktlintCheck detekt"
+
+  lint-fe:
+    desc: ESLint
+    cmds:
+      - "{{.COMPOSE}} exec frontend npm run lint"
+
+  sync:
+    desc: 差分同期を手動トリガー (POST /api/sync)
+    cmds:
+      - curl -fsS -X POST http://localhost:8080/api/sync
+      - echo ""
+
+  reconcile:
+    desc: Reconciliation を手動トリガー (POST /api/reconcile)
+    cmds:
+      - curl -fsS -X POST http://localhost:8080/api/reconcile
+      - echo ""
+
+  seed-redmine:
+    desc: Redmine にサンプルチケット 10〜20 件を投入 (T-0-4 で実装)
+    cmds:
+      - bash scripts/seed-redmine.sh
