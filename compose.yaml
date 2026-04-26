@@ -1,2 +1,204 @@
-# Docker Compose 定義は T-0-2 で実装する。
-# このファイルは T-0-1 のリポジトリ雛形作成で空のプレースホルダとして配置されている。
+# =============================================================================
+# Redmine Knowledge Agent - Docker Compose
+#
+# サービス一覧:
+#   frontend     React + Vite (dev mode)
+#   backend      Spring Boot + Koog
+#   redmine      Redmine 5
+#   redmine-db   MySQL 8 (Redmine 専用、内部のみ)
+#   qdrant       Qdrant (REST 6333 / gRPC 6334)
+#   app-db       PostgreSQL 16 (同期メタデータ)
+#
+# 起動: `docker compose up -d` (前提: ./.env を作成しておく / Ollama はホスト側で起動)
+# 停止: `docker compose down`
+# 永続化: qdrant-data, app-db-data, redmine-db-data, redmine-files
+#
+# 詳細仕様: docs/01-design.md §2.2, §9
+# =============================================================================
+name: redmine-knowledge-agent
+
+services:
+  # ---------------------------------------------------------------------------
+  # Frontend: React + Vite
+  #   - bind mount で ./frontend を /app に同期 (HMR を効かせる)
+  #   - node_modules は名前付き volume に逃がす (host との衝突防止)
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: .
+      dockerfile: infra/docker/frontend.Dockerfile
+    container_name: rka-frontend
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_BASE_URL: /api
+    volumes:
+      - ./frontend:/app
+      - frontend-node-modules:/app/node_modules
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:5173/ >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Backend: Spring Boot + Koog
+  #   - Ollama はホスト側 (host.docker.internal:11434) を見る
+  #   - app-db / qdrant / redmine がすべて healthy になってから起動
+  # ---------------------------------------------------------------------------
+  backend:
+    build:
+      context: .
+      dockerfile: infra/docker/backend.Dockerfile
+    container_name: rka-backend
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_LLM_MODEL: ${OLLAMA_LLM_MODEL:-qwen2.5:7b}
+      OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-nomic-embed-text}
+      REDMINE_BASE_URL: ${REDMINE_BASE_URL:-http://redmine:3000}
+      REDMINE_API_KEY: ${REDMINE_API_KEY}
+      QDRANT_HOST: ${QDRANT_HOST:-qdrant}
+      QDRANT_PORT: ${QDRANT_PORT:-6334}
+      QDRANT_COLLECTION: ${QDRANT_COLLECTION:-redmine_tickets}
+      APP_DB_URL: ${APP_DB_URL:-jdbc:postgresql://app-db:5432/redmineagent}
+      APP_DB_USER: ${APP_DB_USER:-redmineagent}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:-redmineagent}
+      SYNC_CRON: ${SYNC_CRON:-0 0 * * * *}
+      RECONCILE_CRON: ${RECONCILE_CRON:-0 0 3 * * SUN}
+    volumes:
+      - ./backend:/app
+      - backend-gradle-cache:/root/.gradle
+    depends_on:
+      app-db:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      redmine:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 90s
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Redmine 5: チケットストア (UI: http://localhost:3000)
+  # ---------------------------------------------------------------------------
+  redmine:
+    image: redmine:5
+    container_name: rka-redmine
+    ports:
+      - "3000:3000"
+    environment:
+      REDMINE_DB_MYSQL: redmine-db
+      REDMINE_DB_PORT: 3306
+      REDMINE_DB_DATABASE: redmine
+      REDMINE_DB_USERNAME: redmine
+      REDMINE_DB_PASSWORD: redmine
+      REDMINE_SECRET_KEY_BASE: ${REDMINE_SECRET_KEY_BASE:-please-change-me-in-production}
+    volumes:
+      - redmine-files:/usr/src/redmine/files
+    depends_on:
+      redmine-db:
+        condition: service_healthy
+    healthcheck:
+      # Redmine の rails 起動は重いため start_period を長めに
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 90s
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Redmine 用 MySQL (内部のみ、ホストへ公開しない)
+  # ---------------------------------------------------------------------------
+  redmine-db:
+    image: mysql:8
+    container_name: rka-redmine-db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${REDMINE_DB_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: redmine
+      MYSQL_USER: redmine
+      MYSQL_PASSWORD: redmine
+    command:
+      # Redmine 5 は utf8mb4 必須
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - redmine-db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uredmine", "-predmine"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Qdrant: ベクトルストア
+  #   - REST 6333 / gRPC 6334 を公開
+  #   - イメージに curl/wget が無いため /dev/tcp でポート疎通だけ確認
+  # ---------------------------------------------------------------------------
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: rka-qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant-data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/6333 && exit 0 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # app-db: 同期メタデータ用 PostgreSQL
+  # ---------------------------------------------------------------------------
+  app-db:
+    image: postgres:16
+    container_name: rka-app-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: redmineagent
+      POSTGRES_USER: redmineagent
+      POSTGRES_PASSWORD: ${APP_DB_PASSWORD:-redmineagent}
+    volumes:
+      - app-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U redmineagent -d redmineagent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+# =============================================================================
+# 永続化ボリューム
+# =============================================================================
+volumes:
+  app-db-data:
+  qdrant-data:
+  redmine-db-data:
+  redmine-files:
+  backend-gradle-cache:
+  frontend-node-modules:
