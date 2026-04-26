@@ -72,7 +72,7 @@ flowchart TB
 
 | サービス名     | イメージ / ベース             | ポート (host) | 役割                          |
 | -------------- | ---------------------------- | ------------- | ----------------------------- |
-| `frontend`     | node:20 + Vite               | 5173          | UI                            |
+| `frontend`     | node:24-bookworm-slim + Vite | 5173          | UI                            |
 | `backend`      | eclipse-temurin:21 + Gradle  | 8080          | API + バッチ + エージェント   |
 | `redmine`      | redmine:5                    | 3000          | チケット格納                  |
 | `redmine-db`   | mysql:8                      | (内部のみ)    | Redmine 用 RDB                |
