@@ -76,7 +76,7 @@ task seed-redmine # Redmine にサンプルチケット投入
 2. Skill `/task <タスクID>` で実装を依頼 (例: `/task T-1-4`)
 3. テスト先行 → 実装 → `task lint && task test` グリーン確認
 4. 完了報告のフォーマットに従って成果を提示
-5. 人間レビュー後、人間がコミット (`git commit` / `git push` は AI 実行禁止)
+5. AI が Conventional Commits 形式でコミットし、作業ブランチへ push (`main` への直接 push は禁止。レビューは PR 作成後に人間が実施)
 
 ## 現在のフェーズ
 
