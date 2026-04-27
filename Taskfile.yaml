@@ -75,9 +75,9 @@ tasks:
       - task: lint-fe
 
   lint-be:
-    desc: ktlint + detekt
+    desc: Spotless (ktlint 内包) + Detekt 2.x
     cmds:
-      - "{{.COMPOSE}} exec backend ./gradlew ktlintCheck detekt"
+      - "{{.COMPOSE}} exec backend ./gradlew spotlessCheck detekt"
 
   lint-fe:
     desc: ESLint

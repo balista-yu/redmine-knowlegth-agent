@@ -73,7 +73,7 @@ flowchart TB
 | サービス名     | イメージ / ベース             | ポート (host) | 役割                          |
 | -------------- | ---------------------------- | ------------- | ----------------------------- |
 | `frontend`     | node:24-bookworm-slim + Vite | 5173          | UI                            |
-| `backend`      | eclipse-temurin:21 + Gradle  | 8080          | API + バッチ + エージェント   |
+| `backend`      | eclipse-temurin:25 + Gradle  | 8080          | API + バッチ + エージェント   |
 | `redmine`      | redmine:5                    | 3000          | チケット格納                  |
 | `redmine-db`   | mysql:8                      | (内部のみ)    | Redmine 用 RDB                |
 | `qdrant`       | qdrant/qdrant:latest         | 6333, 6334    | ベクトルストア                |
@@ -89,19 +89,21 @@ flowchart TB
 
 | 用途              | ライブラリ                                       | バージョン目安 |
 | ----------------- | ------------------------------------------------ | -------------- |
-| エージェント基盤   | `ai.koog:koog-agents-jvm`                        | 0.7.3          |
-| Koog Embedding    | `ai.koog:koog-embeddings-local` (Ollama)         | 0.7.3          |
-| Koog RAG          | `ai.koog:koog-rag-vector`                        | 0.7.3          |
-| Koog Ollama       | `ai.koog:koog-prompt-executor-ollama-client`     | 0.7.3          |
-| Web フレームワーク | `org.springframework.boot:spring-boot-starter-*` | 3.5.x          |
+| 言語             | Kotlin                                            | 2.3.x          |
+| ランタイム       | JDK (toolchain で取得)                            | 25 LTS         |
+| エージェント基盤   | `ai.koog:koog-agents-jvm`                        | 0.8.x          |
+| Koog Embedding    | `ai.koog:koog-embeddings-local` (Ollama)         | 0.8.x          |
+| Koog RAG          | `ai.koog:koog-rag-vector`                        | 0.8.x          |
+| Koog Ollama       | `ai.koog:koog-prompt-executor-ollama-client`     | 0.8.x          |
+| Web フレームワーク | `org.springframework.boot:spring-boot-starter-*` | 4.0.x          |
 | HTTP クライアント | Spring `WebClient`                                | (Spring 同梱) |
-| Qdrant クライアント | `io.qdrant:client`                                | 最新安定      |
+| Qdrant クライアント | `io.qdrant:client`                                | 1.x 最新安定  |
 | 同期メタ DB       | Spring Data JPA + Postgres Driver                | (Spring 同梱) |
 | スケジューラ       | Spring `@Scheduled`                               | (Spring 同梱) |
-| **テスト**         | JUnit 5, MockK, Kotest assertions, Testcontainers, Spring Boot Test, ArchUnit | (各最新) |
-| **静的解析**       | ktlint, detekt                                    | (各最新)       |
+| **テスト**         | JUnit 5, MockK, Kotest 6.x assertions, Testcontainers 2.x, Spring Boot Test, ArchUnit 1.4 | (各最新) |
+| **静的解析**       | Spotless (ktlint 1.8 内包), Detekt 2.x            | (各最新)       |
 
-> Koog 0.7.x 系の `OllamaEmbeddingModels.*`, `EmbeddingStorage`, `VectorStorageBackend` 等は時期により表記が変わっている。実装時に最新ドキュメントで再確認。
+> Koog 0.8.x 系の `OllamaEmbeddingModels.*`, `EmbeddingStorage`, `VectorStorageBackend` 等は時期により表記が変わっている。実装時に最新ドキュメントで再確認。
 
 ## 3. 機能設計
 

@@ -1,0 +1,73 @@
+# =============================================================================
+# Detekt 2.x 設定
+# =============================================================================
+# buildUponDefaultConfig=true なのでデフォルト設定にこのファイルでオーバーライド。
+# プロジェクトの方針 (.claude/rules/code-style.md) に合わせて緩和 / 強化する。
+#
+# Detekt 2.0 で設定スキーマが大きく変わった点に注意:
+#   - `build:` ブロック削除
+#   - `UnusedPrivateMember` → 用途別 (Class / Function / Property) に分離
+#   - `threshold` 系の名前が `allowedLines` / `allowedComplexity` 等に変更
+# =============================================================================
+
+style:
+  MagicNumber:
+    active: true
+    ignoreNumbers: ['-1', '0', '1', '2']
+    ignoreHashCodeFunction: true
+    ignoreEnums: true
+    ignoreCompanionObjectPropertyDeclaration: true
+  MaxLineLength:
+    active: true
+    maxLineLength: 140
+  ReturnCount:
+    active: true
+    max: 4
+  WildcardImport:
+    active: true
+  UnusedPrivateClass:
+    active: true
+  UnusedPrivateFunction:
+    active: true
+  UnusedPrivateProperty:
+    active: true
+
+complexity:
+  TooManyFunctions:
+    active: false  # SpringBoot Configuration クラスなどで普通に増えるため
+  LongMethod:
+    active: true
+    allowedLines: 60
+  LongParameterList:
+    active: true
+    allowedFunctionParameters: 8
+    allowedConstructorParameters: 10  # ApplicationService の DI で増えがち
+  CyclomaticComplexMethod:
+    active: true
+    allowedComplexity: 15
+
+naming:
+  FunctionNaming:
+    active: true
+    ignoreAnnotated: ['Test']  # backtick test name を許可
+  TopLevelPropertyNaming:
+    active: true
+    constantPattern: '[A-Z][_A-Z0-9]*'
+
+exceptions:
+  TooGenericExceptionCaught:
+    active: true
+    exceptionNames:
+      - ArrayIndexOutOfBoundsException
+      - Error
+      - Exception
+      - IllegalMonitorStateException
+      - NullPointerException
+      - IndexOutOfBoundsException
+      - RuntimeException
+      - Throwable
+
+empty-blocks:
+  EmptyFunctionBlock:
+    active: true
+    ignoreOverridden: true

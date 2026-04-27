@@ -1,0 +1,76 @@
+# =============================================================================
+# Redmine Knowledge Agent - backend application config
+# =============================================================================
+# 環境変数は .env / docker compose 経由で注入される (詳細: docs/01-design.md §9)
+# テスト用 override は application-test.yml で行う。
+# =============================================================================
+
+spring:
+  application:
+    name: redmine-knowledge-agent
+
+  datasource:
+    url: ${APP_DB_URL:jdbc:postgresql://localhost:5432/redmineagent}
+    username: ${APP_DB_USER:redmineagent}
+    password: ${APP_DB_PASSWORD:redmineagent}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      # スキーマ管理は Flyway 一本化。Hibernate 側は触らない
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+
+  threads:
+    virtual:
+      enabled: true
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+
+logging:
+  level:
+    root: INFO
+    com.example.redmineagent: DEBUG
+
+# =============================================================================
+# Application 固有設定
+# =============================================================================
+app:
+  ollama:
+    base-url: ${OLLAMA_BASE_URL:http://host.docker.internal:11434}
+    llm-model: ${OLLAMA_LLM_MODEL:qwen2.5:7b}
+    embed-model: ${OLLAMA_EMBED_MODEL:nomic-embed-text}
+
+  redmine:
+    base-url: ${REDMINE_BASE_URL:http://redmine:3000}
+    api-key: ${REDMINE_API_KEY:}
+
+  qdrant:
+    host: ${QDRANT_HOST:qdrant}
+    port: ${QDRANT_PORT:6334}
+    collection: ${QDRANT_COLLECTION:redmine_tickets}
+
+  sync:
+    cron: ${SYNC_CRON:0 0 * * * *}
+    reconcile-cron: ${RECONCILE_CRON:0 0 3 * * SUN}

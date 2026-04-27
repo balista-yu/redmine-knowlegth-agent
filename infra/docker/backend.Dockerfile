@@ -9,7 +9,7 @@
 # Gradle wrapper / build.gradle.kts / src/ は T-1-1 (Backend プロジェクト初期化) で
 # 追加される。それまでは `docker compose up backend` は failed health で停止する。
 # =============================================================================
-FROM eclipse-temurin:21-jdk
+FROM eclipse-temurin:25-jdk
 
 WORKDIR /app
 

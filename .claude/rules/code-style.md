@@ -98,9 +98,10 @@ logger.info("Sync completed: fetched=$fetched, upserted=$upserted")
 - **trailing lambda**: `things.map { it.transform() }` (括弧外に出す)
 - **string template** で文字列結合 (`+` を使わない)
 
-## ktlint / detekt
+## Spotless (ktlint 内包) / Detekt 2.x
 
-- ビルドに組み込み済み: `task lint` で実行
+- ビルドに組み込み済み: `task lint` で実行 (内部で `spotlessCheck` + `detekt`)
+- フォーマット崩れは `./gradlew spotlessApply` で自動修正可能
 - detekt 警告は **直す or `@Suppress` で抑制理由を明記**
 - 抑制を多用しない (本質的な問題があるサイン)
 
@@ -109,5 +110,5 @@ logger.info("Sync completed: fetched=$fetched, upserted=$upserted")
 以下のいずれか 1 つでも fail すると CI は red:
 
 - `./gradlew test` (単体・統合・ArchUnit すべて含む)
-- `./gradlew ktlintCheck`
+- `./gradlew spotlessCheck`
 - `./gradlew detekt`
