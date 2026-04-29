@@ -81,6 +81,8 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test") {
         exclude(group = "org.mockito") // MockK を使うため
     }
+    // Spring Boot 4.0 で @WebMvcTest は別 starter (spring-boot-starter-webmvc-test) に分離された
+    testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("io.mockk:mockk:${Versions.MOCKK}")
     testImplementation("io.kotest:kotest-assertions-core:${Versions.KOTEST}")
     // Testcontainers 2.x で submodule 名が "testcontainers-*" に統一された
