@@ -11,8 +11,11 @@
 name: CI
 
 on:
+  # PR への push は pull_request トリガで CI される (feature branch への push でも同様)
+  # main への direct push (= PR merge) は push トリガで二重起動なく検証
   pull_request:
   push:
+    branches: [main]
 
 # 同 PR / branch で複数 push が起きたら古い run はキャンセル
 concurrency:
