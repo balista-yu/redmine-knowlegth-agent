@@ -65,7 +65,7 @@
   - 依存追加 (本番):
     - `org.springframework.boot:spring-boot-starter-{web,webflux,data-jpa,actuator}`
     - `org.flywaydb:flyway-core`, `org.postgresql:postgresql`
-    - `ai.koog:koog-{agents-jvm,embeddings-local,rag-vector,prompt-executor-ollama-client}:0.7.3`
+    - `ai.koog:koog-{agents-jvm,embeddings-local,rag-vector,prompt-executor-ollama-client}:0.8.x`
     - `io.qdrant:client:<latest>`
     - `org.jetbrains.kotlinx:kotlinx-coroutines-reactor`
   - 依存追加 (テスト):
@@ -74,11 +74,11 @@
     - `org.testcontainers:{testcontainers,postgresql,junit-jupiter}:<latest>`
     - `org.jetbrains.kotlinx:kotlinx-coroutines-test`
     - `com.tngtech.archunit:archunit-junit5:<latest>`
-  - プラグイン: ktlint, detekt, JaCoCo
+  - プラグイン: Spotless (ktlint 内包), Detekt 2.x, JaCoCo
 - **テスト要件**:
   - サンプル 1 本 (`HealthCheckTest`: `/actuator/health` が `UP`)
   - **ArchUnit テスト初期セット** (`arch/OnionArchitectureTest.kt`): `01-design.md` §6.6 の 7 ルールすべて
-- **DoD**: `./gradlew bootRun` 8080 起動、`./gradlew test` でサンプル + ArchUnit 成功、`./gradlew ktlintCheck detekt` クリーン
+- **DoD**: `./gradlew bootRun` 8080 起動、`./gradlew test` でサンプル + ArchUnit 成功、`./gradlew spotlessCheck detekt` クリーン
 
 ### T-1-2: Domain Model 定義
 

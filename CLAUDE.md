@@ -64,7 +64,7 @@ task down         # 停止
 task logs-app     # backend ログ
 task test         # backend + frontend の全テスト
 task test-be      # backend のみ (unit + integration)
-task lint         # ktlint + detekt + ESLint
+task lint         # Spotless (ktlint) + Detekt + ESLint
 task sync         # 手動で差分同期実行
 task reconcile    # 手動で Reconciliation
 task seed-redmine # Redmine にサンプルチケット投入
