@@ -47,6 +47,9 @@ jobs:
       - name: Test (unit + ArchUnit)
         run: ./gradlew --no-daemon test
 
+      - name: Integration Test (Testcontainers)
+        run: ./gradlew --no-daemon integrationTest
+
       - name: Upload JaCoCo report
         if: always()
         uses: actions/upload-artifact@v4

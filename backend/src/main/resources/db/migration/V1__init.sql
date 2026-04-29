@@ -28,7 +28,8 @@ COMMENT ON COLUMN sync_state.tickets_total         IS 'Qdrant 上のユニーク
 
 
 CREATE TABLE sync_run (
-    id                SERIAL       PRIMARY KEY,
+    -- BIGSERIAL: log テーブルなので 32-bit 上限を回避し SyncRunEntity (Long) と合わせる
+    id                BIGSERIAL    PRIMARY KEY,
     kind              VARCHAR(32)  NOT NULL,
     started_at        TIMESTAMPTZ  NOT NULL,
     finished_at       TIMESTAMPTZ,

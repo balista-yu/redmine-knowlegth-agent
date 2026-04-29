@@ -216,7 +216,7 @@ payload:
 
 | カラム            | 型                       | 説明                                 |
 | ----------------- | ------------------------ | ------------------------------------ |
-| `id`              | SERIAL PK                |                                      |
+| `id`              | BIGSERIAL PK             | log テーブルなので 64-bit              |
 | `kind`            | VARCHAR(32)              | "incremental" / "full" / "reconcile" |
 | `started_at`      | TIMESTAMPTZ              |                                      |
 | `finished_at`     | TIMESTAMPTZ NULL         |                                      |
