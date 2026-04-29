@@ -12,9 +12,7 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
   push:
-    branches: [main]
 
 # 同 PR / branch で複数 push が起きたら古い run はキャンセル
 concurrency:
