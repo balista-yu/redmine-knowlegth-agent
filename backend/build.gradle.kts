@@ -93,16 +93,38 @@ dependencies {
 }
 
 // =============================================================================
-// Test
+// Test (`*Test` suffix = unit) と integrationTest (`*IT` suffix) を分離。
+//   CI の `test` ジョブはユニット限定。Testcontainers 系は `integrationTest` で
+//   Docker daemon があるホストで明示的に走らせる方針 (ローカルおよび手動 CI step)。
 // =============================================================================
 tasks.test {
     useJUnitPlatform()
+    filter {
+        excludeTestsMatching("*IT")
+    }
     testLogging {
         events("failed", "skipped")
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
         showStackTraces = true
     }
     finalizedBy(tasks.jacocoTestReport)
+}
+
+tasks.register<Test>("integrationTest") {
+    description = "Runs *IT tests (Testcontainers / 外部依存あり)"
+    group = "verification"
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("*IT")
+    }
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    shouldRunAfter(tasks.test)
+    testLogging {
+        events("failed", "skipped", "passed")
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        showStackTraces = true
+    }
 }
 
 // =============================================================================
