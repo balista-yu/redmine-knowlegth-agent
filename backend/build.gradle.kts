@@ -75,6 +75,7 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:${Versions.COROUTINES}")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
+    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
 
     // --- Test -----------------------------------------------------------------
     testImplementation("org.springframework.boot:spring-boot-starter-test") {
@@ -86,6 +87,7 @@ dependencies {
     testImplementation("org.testcontainers:testcontainers:${Versions.TESTCONTAINERS}")
     testImplementation("org.testcontainers:testcontainers-postgresql:${Versions.TESTCONTAINERS}")
     testImplementation("org.testcontainers:testcontainers-junit-jupiter:${Versions.TESTCONTAINERS}")
+    testImplementation("com.squareup.okhttp3:mockwebserver:5.3.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${Versions.COROUTINES}")
     testImplementation("com.tngtech.archunit:archunit-junit5:${Versions.ARCHUNIT}")
 }
