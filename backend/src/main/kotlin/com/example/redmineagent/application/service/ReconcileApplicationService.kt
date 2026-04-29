@@ -42,7 +42,7 @@ class ReconcileApplicationService(
 
     suspend fun execute(): SyncRun {
         if (!running.compareAndSet(false, true)) {
-            throw SyncAlreadyRunningException("Reconcile is already running")
+            throw SyncAlreadyRunningException(message = "Reconcile is already running")
         }
         val startedAt = Instant.now()
         return try {
