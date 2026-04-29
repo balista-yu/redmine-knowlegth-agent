@@ -1,0 +1,117 @@
+# =============================================================================
+# CI: backend (lint + test) / docker compose validation / frontend (T-3-1 後)
+# =============================================================================
+# Triggers:
+#   - PR -> main
+#   - main への direct push (リリース後検証)
+#
+# .claude/rules/code-style.md §「CI で落ちる条件」:
+#   ./gradlew test / spotlessCheck / detekt のいずれか fail で CI red
+# =============================================================================
+name: CI
+
+on:
+  pull_request:
+  push:
+
+# 同 PR / branch で複数 push が起きたら古い run はキャンセル
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend (Kotlin / Spring Boot)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup JDK 25 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Lint (Spotless + Detekt)
+        run: ./gradlew --no-daemon spotlessCheck detekt
+
+      - name: Test (unit + ArchUnit)
+        run: ./gradlew --no-daemon test
+
+      - name: Upload JaCoCo report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-jacoco
+          path: backend/build/reports/jacoco/test/jacocoTestReport.xml
+          if-no-files-found: ignore
+
+      - name: Upload test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-reports
+          path: backend/build/reports/tests/test/
+          if-no-files-found: ignore
+
+  compose:
+    name: Docker Compose validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate compose.yaml
+        # REDMINE_API_KEY 等は本番でしか値を持たないので空でも config 自体は通る
+        run: docker compose config --quiet
+        env:
+          REDMINE_API_KEY: ''
+
+  frontend:
+    name: Frontend (React / Vite)
+    # frontend/package.json が存在しない間 (T-3-1 完了前) は steps 内で短絡。
+    # job 自体は常に走るが Node セットアップ以降は ready=false でスキップ。
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check if frontend is ready
+        id: check
+        run: |
+          if [ -f package.json ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::frontend/package.json not found yet (T-3-1 で実装予定)"
+          fi
+
+      - name: Setup Node 24
+        if: steps.check.outputs.ready == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        if: steps.check.outputs.ready == 'true'
+        run: npm ci
+
+      - name: Lint (ESLint)
+        if: steps.check.outputs.ready == 'true'
+        run: npm run lint
+
+      - name: Test (Vitest)
+        if: steps.check.outputs.ready == 'true'
+        run: npm test --silent
