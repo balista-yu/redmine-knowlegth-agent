@@ -13,11 +13,19 @@ class ScoredChunkTest {
             content = "body",
             contentHash = "abc",
         )
+    private val baseMetadata =
+        TicketMetadata(
+            subject = "subject",
+            url = "http://redmine.example/issues/1",
+            projectName = "proj",
+            status = "New",
+            tracker = "Bug",
+        )
 
     @Test
     fun `score が負なら IllegalArgumentException`() {
         shouldThrow<IllegalArgumentException> {
-            ScoredChunk(chunk = baseChunk, score = -0.01f)
+            ScoredChunk(chunk = baseChunk, metadata = baseMetadata, score = -0.01f)
         }
     }
 }
