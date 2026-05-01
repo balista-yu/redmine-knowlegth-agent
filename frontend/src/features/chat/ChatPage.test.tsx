@@ -7,8 +7,10 @@ import { ChatPage } from "./ChatPage";
 
 // =============================================================================
 // MSW で /api/chat の SSE をモックする。
-// MSW v2 は ReadableStream を直接 body に渡せるため、`text/event-stream` を組み立てる。
+// MSW v2 は相対パスを「任意ホストの該当パス」にマッチさせる。
 // =============================================================================
+
+const CHAT_URL = "/api/chat";
 
 function sseStream(...frames: string[]): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
@@ -31,7 +33,7 @@ afterAll(() => server.close());
 describe("ChatPage", () => {
   it("送信すると delta を連結して assistant メッセージとして表示する", async () => {
     server.use(
-      http.post("/api/chat", () => {
+      http.post(CHAT_URL, () => {
         return new HttpResponse(
           sseStream(
             'event: delta\ndata: {"text":"Hello, "}',
@@ -59,7 +61,7 @@ describe("ChatPage", () => {
 
   it("sources イベントで引用カード (subject + URL) が表示される", async () => {
     server.use(
-      http.post("/api/chat", () => {
+      http.post(CHAT_URL, () => {
         return new HttpResponse(
           sseStream(
             'event: delta\ndata: {"text":"answer"}',
@@ -101,7 +103,7 @@ describe("ChatPage", () => {
 
   it("error イベントを受信すると赤バナー (alert) が表示される", async () => {
     server.use(
-      http.post("/api/chat", () => {
+      http.post(CHAT_URL, () => {
         return new HttpResponse(
           sseStream(
             'event: error\ndata: {"code":"OLLAMA_UNAVAILABLE","message":"ollama unreachable"}',
@@ -125,19 +127,18 @@ describe("ChatPage", () => {
   });
 
   it("送信中は送信ボタンが disabled になり 応答中... 表示", async () => {
-    // close を後から呼べるようにコントローラを外部に持ち出す
+    // 「ストリーム進行中」を表現するため、close を後から呼べるように controller を外部参照する
     const controllerRef: { current: ReadableStreamDefaultController<Uint8Array> | null } = {
       current: null,
     };
     server.use(
-      http.post("/api/chat", () => {
+      http.post(CHAT_URL, () => {
         const stream = new ReadableStream<Uint8Array>({
           start(controller) {
             const encoder = new TextEncoder();
             controller.enqueue(
               encoder.encode('event: delta\ndata: {"text":"hi"}\n\n'),
             );
-            // close せず controller を保持しておく (テスト末尾で close)
             controllerRef.current = controller;
           },
         });
@@ -157,13 +158,18 @@ describe("ChatPage", () => {
     const button = await screen.findByRole("button", { name: "応答中..." });
     expect(button).toBeDisabled();
 
-    // クリーンアップ: ストリームを終了させる
+    // クリーンアップ: done イベントを送ってからストリームを閉じる
+    // (これで消費側が正常終端し、status=idle に戻る)
+    const encoder = new TextEncoder();
+    controllerRef.current?.enqueue(
+      encoder.encode('event: done\ndata: {"conversationId":"c-stream"}\n\n'),
+    );
     controllerRef.current?.close();
   });
 
   it("HTTP エラー (500) でエラーバナー表示", async () => {
     server.use(
-      http.post("/api/chat", () => {
+      http.post(CHAT_URL, () => {
         return new HttpResponse("server boom", { status: 500 });
       }),
     );
