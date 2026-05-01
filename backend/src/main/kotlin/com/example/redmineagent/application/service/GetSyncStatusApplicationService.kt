@@ -22,8 +22,9 @@ class GetSyncStatusApplicationService(
     suspend fun getStatus(): SyncStatusSnapshot {
         val state = syncStateRepository.load()
         val recent = syncStateRepository.listRecentRuns(1, kind = null).firstOrNull()
+        // Kotlin 2.3 の smart-cast: running が true なら recent は非 null (status check 経由)
         val running = recent != null && recent.status == SyncRunStatus.RUNNING
-        val currentRunId = if (running) recent?.id else null
+        val currentRunId = if (running) recent.id else null
         return SyncStatusSnapshot(
             state = state,
             currentlyRunning = running,

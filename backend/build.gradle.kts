@@ -29,7 +29,15 @@ version = "0.1.0-SNAPSHOT"
 kotlin {
     jvmToolchain(25)
     compilerOptions {
-        freeCompilerArgs.addAll("-Xjsr305=strict")
+        // -Xjsr305=strict: JSR-305 (@Nullable 等) の null 性を strict 扱い
+        // -Xannotation-default-target=param-property:
+        //   Kotlin 2.3 で各種アノテーション (@Lazy, @Value, @JsonProperty 等) のデフォルト
+        //   ターゲットが param-property (param + field) に変わる予定。明示しないと
+        //   遷移期間中の "annotation will also be applied to field" 警告が大量に出る
+        freeCompilerArgs.addAll(
+            "-Xjsr305=strict",
+            "-Xannotation-default-target=param-property",
+        )
     }
 }
 
@@ -76,6 +84,9 @@ dependencies {
     // --- Kotlin / coroutines --------------------------------------------------
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:${Versions.COROUTINES}")
+    // Jackson 3.x (Spring Boot 4.0 から `JacksonJsonDecoder` 等が tools.jackson 系を要求)
+    // Jackson 2.x モジュールは Spring Boot Json 4 が後方互換のため引き続きスターター経由で残る
+    implementation("tools.jackson.module:jackson-module-kotlin")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
 

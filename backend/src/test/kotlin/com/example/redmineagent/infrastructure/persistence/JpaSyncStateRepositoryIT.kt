@@ -12,9 +12,9 @@ import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
-import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
+import org.testcontainers.postgresql.PostgreSQLContainer
 import java.time.Instant
 
 /**
@@ -108,9 +108,10 @@ class JpaSyncStateRepositoryIT {
         }
 
     companion object {
+        // Testcontainers 2.x の PostgreSQLContainer は型パラメータ無し (旧 SELF パターン廃止)
         @Container
         @JvmStatic
-        val postgres: PostgreSQLContainer<*> =
+        val postgres: PostgreSQLContainer =
             PostgreSQLContainer("postgres:16")
                 .withDatabaseName("redmineagent")
                 .withUsername("redmineagent")
@@ -119,9 +120,9 @@ class JpaSyncStateRepositoryIT {
         @JvmStatic
         @DynamicPropertySource
         fun dataSourceProperties(registry: DynamicPropertyRegistry) {
-            registry.add("spring.datasource.url", postgres::getJdbcUrl)
-            registry.add("spring.datasource.username", postgres::getUsername)
-            registry.add("spring.datasource.password", postgres::getPassword)
+            registry.add("spring.datasource.url") { postgres.jdbcUrl }
+            registry.add("spring.datasource.username") { postgres.username }
+            registry.add("spring.datasource.password") { postgres.password }
         }
     }
 }
