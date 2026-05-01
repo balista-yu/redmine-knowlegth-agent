@@ -3,17 +3,15 @@ import { describe, it, expect } from "vitest";
 import { App } from "./App";
 
 describe("App", () => {
-  it("ヘッダにアプリ名が表示される", () => {
+  it("ChatPage が描画される (タイトルが表示される)", () => {
     render(<App />);
     expect(
       screen.getByRole("heading", { name: "Redmine Knowledge Agent" }),
     ).toBeInTheDocument();
   });
 
-  it("Phase 3 雛形のプレースホルダ説明が表示される", () => {
+  it("メッセージ入力欄がある", () => {
     render(<App />);
-    expect(
-      screen.getByText(/Frontend skeleton ready/i),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText("メッセージ入力")).toBeInTheDocument();
   });
 });
