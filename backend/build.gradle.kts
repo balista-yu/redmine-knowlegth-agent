@@ -11,6 +11,8 @@ plugins {
     kotlin("jvm") version kotlinVersion
     kotlin("plugin.spring") version kotlinVersion
     kotlin("plugin.jpa") version kotlinVersion
+    // RagSearchTool の @Serializable / KSerializer 自動生成用 (T-2-2)
+    kotlin("plugin.serialization") version kotlinVersion
 
     id("org.springframework.boot") version "4.0.6"
     id("io.spring.dependency-management") version "1.1.7"

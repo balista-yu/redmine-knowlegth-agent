@@ -1,9 +1,11 @@
 package com.example.redmineagent.domain.model
 
 /**
- * チャンク + Embedding ベクトル。Qdrant に upsert する点 (Point) の Domain 表現。
+ * チャンク + Embedding ベクトル + 表示メタデータ。Qdrant に upsert する点 (Point) の
+ * Domain 表現。
  *
- * vector の次元はモデル依存 (例: nomic-embed-text = 768)。
+ * vector の次元はモデル依存 (例: nomic-embed-text = 768)。`metadata` は payload に
+ * 同梱されて検索結果 (`ScoredChunk`) で参照される。
  *
  * `data class` ではなく通常 class:
  *   FloatArray の equals/hashCode は参照ベースのため、value semantics を持つ
@@ -13,6 +15,7 @@ package com.example.redmineagent.domain.model
 class TicketChunkVector(
     val chunk: TicketChunk,
     val vector: FloatArray,
+    val metadata: TicketMetadata,
 ) {
     val dimension: Int get() = vector.size
 

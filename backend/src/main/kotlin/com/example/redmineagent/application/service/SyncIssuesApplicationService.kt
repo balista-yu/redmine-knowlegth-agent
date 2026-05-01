@@ -10,6 +10,7 @@ import com.example.redmineagent.domain.model.SyncRun
 import com.example.redmineagent.domain.model.SyncRunStatus
 import com.example.redmineagent.domain.model.TicketChunk
 import com.example.redmineagent.domain.model.TicketChunkVector
+import com.example.redmineagent.domain.model.TicketMetadata
 import com.example.redmineagent.domain.repository.SyncStateRepository
 import com.example.redmineagent.domain.repository.TicketChunkRepository
 import com.example.redmineagent.domain.service.ChunkBuilder
@@ -151,6 +152,7 @@ class SyncIssuesApplicationService(
         counts: RunCounts,
     ) {
         val newChunks = ChunkBuilder.build(issue)
+        val metadata = TicketMetadata.fromIssue(issue)
         val existing = ticketChunkRepository.findByTicketId(issue.ticketId)
         val existingHashByKey =
             existing.associateBy { ChunkKey(it.chunkType, it.chunkIndex, it.subIndex) }
@@ -169,7 +171,7 @@ class SyncIssuesApplicationService(
         if (toEmbed.isNotEmpty()) {
             val vectors = mutableListOf<TicketChunkVector>()
             for (chunk in toEmbed) {
-                vectors += embedWithSplitOnOverflow(chunk, depth = 0)
+                vectors += embedWithSplitOnOverflow(chunk, metadata, depth = 0)
             }
             if (vectors.isNotEmpty()) {
                 ticketChunkRepository.upsert(vectors)
@@ -188,11 +190,12 @@ class SyncIssuesApplicationService(
      */
     private suspend fun embedWithSplitOnOverflow(
         chunk: TicketChunk,
+        metadata: TicketMetadata,
         depth: Int,
     ): List<TicketChunkVector> =
         try {
             val vector = embeddingService.embed(chunk.content)
-            listOf(TicketChunkVector(chunk, vector))
+            listOf(TicketChunkVector(chunk, vector, metadata))
         } catch (e: EmbeddingTooLongException) {
             if (depth >= MAX_SPLIT_DEPTH) {
                 logger.warn(
@@ -205,7 +208,7 @@ class SyncIssuesApplicationService(
                 )
                 emptyList()
             } else {
-                splitInHalf(chunk).flatMap { embedWithSplitOnOverflow(it, depth + 1) }
+                splitInHalf(chunk).flatMap { embedWithSplitOnOverflow(it, metadata, depth + 1) }
             }
         }
 

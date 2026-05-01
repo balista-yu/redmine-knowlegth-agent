@@ -9,6 +9,7 @@ import ai.koog.prompt.llm.LLMCapability
 import ai.koog.prompt.llm.LLMProvider
 import ai.koog.prompt.llm.LLModel
 import com.example.redmineagent.infrastructure.agent.KoogAgentFactory
+import com.example.redmineagent.infrastructure.agent.tool.RagSearchTool
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -50,10 +51,9 @@ class KoogConfig {
     @Lazy
     fun promptExecutor(ollamaClient: OllamaClient): PromptExecutor = MultiLLMPromptExecutor(ollamaClient)
 
-    // T-2-2 で RagSearchTool を含む ToolRegistry に置き換える予定 (本フェーズは空で起動できることを優先)
     @Bean
     @Lazy
-    fun toolRegistry(): ToolRegistry = ToolRegistry.EMPTY
+    fun toolRegistry(ragSearchTool: RagSearchTool): ToolRegistry = ToolRegistry { tool(ragSearchTool) }
 
     @Bean
     @Lazy

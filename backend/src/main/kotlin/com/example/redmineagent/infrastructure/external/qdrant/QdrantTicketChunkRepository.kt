@@ -5,6 +5,7 @@ import com.example.redmineagent.domain.model.ScoredChunk
 import com.example.redmineagent.domain.model.SearchFilter
 import com.example.redmineagent.domain.model.TicketChunk
 import com.example.redmineagent.domain.model.TicketChunkVector
+import com.example.redmineagent.domain.model.TicketMetadata
 import com.example.redmineagent.domain.repository.TicketChunkRepository
 import io.qdrant.client.ConditionFactory.matchKeyword
 import io.qdrant.client.PointIdFactory.id
@@ -135,7 +136,8 @@ class QdrantTicketChunkRepository(
             buildFilter(filter)?.let { builder.setFilter(it) }
             client.searchAsync(builder.build()).get().mapNotNull { hit ->
                 val chunk = hit.payloadMap.toTicketChunk() ?: return@mapNotNull null
-                ScoredChunk(chunk = chunk, score = hit.score)
+                val metadata = hit.payloadMap.toTicketMetadata() ?: return@mapNotNull null
+                ScoredChunk(chunk = chunk, metadata = metadata, score = hit.score)
             }
         }
 
@@ -195,12 +197,19 @@ class QdrantTicketChunkRepository(
         val pid = PointIdGenerator.pointId(chunk)
         val payload =
             mapOf(
+                // チャンク識別子 + 内容
                 PAYLOAD_TICKET_ID to value(chunk.ticketId.toLong()),
                 PAYLOAD_CHUNK_TYPE to value(chunk.chunkType.name.lowercase()),
                 PAYLOAD_CHUNK_INDEX to value(chunk.chunkIndex.toLong()),
                 PAYLOAD_SUB_INDEX to value(chunk.subIndex.toLong()),
                 PAYLOAD_CONTENT to value(chunk.content),
                 PAYLOAD_CONTENT_HASH to value(chunk.contentHash),
+                // 表示メタデータ (TicketHit に投影)
+                PAYLOAD_SUBJECT to value(metadata.subject),
+                PAYLOAD_URL to value(metadata.url),
+                PAYLOAD_PROJECT_NAME to value(metadata.projectName),
+                PAYLOAD_STATUS to value(metadata.status),
+                PAYLOAD_TRACKER to value(metadata.tracker),
             )
         return PointStruct
             .newBuilder()
@@ -243,6 +252,22 @@ class QdrantTicketChunkRepository(
         )
     }
 
+    @Suppress("ReturnCount") // 5 つの metadata field それぞれの欠損を null 返却で表現
+    private fun Map<String, JsonValue>.toTicketMetadata(): TicketMetadata? {
+        val subject = this[PAYLOAD_SUBJECT]?.stringValue ?: return null
+        val url = this[PAYLOAD_URL]?.stringValue ?: return null
+        val projectName = this[PAYLOAD_PROJECT_NAME]?.stringValue ?: return null
+        val status = this[PAYLOAD_STATUS]?.stringValue ?: return null
+        val tracker = this[PAYLOAD_TRACKER]?.stringValue ?: return null
+        return TicketMetadata(
+            subject = subject,
+            url = url,
+            projectName = projectName,
+            status = status,
+            tracker = tracker,
+        )
+    }
+
     companion object {
         private const val UPSERT_BATCH_SIZE = 32
         private const val MAX_SCROLL_PAGE = 256
@@ -257,5 +282,8 @@ class QdrantTicketChunkRepository(
         private const val PAYLOAD_SUB_INDEX = "sub_index"
         private const val PAYLOAD_CONTENT = "content"
         private const val PAYLOAD_CONTENT_HASH = "content_hash"
+        private const val PAYLOAD_SUBJECT = "subject"
+        private const val PAYLOAD_URL = "url"
+        private const val PAYLOAD_PROJECT_NAME = "project_name"
     }
 }
