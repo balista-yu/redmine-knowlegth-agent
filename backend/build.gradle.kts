@@ -98,6 +98,8 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("io.mockk:mockk:${Versions.MOCKK}")
     testImplementation("io.kotest:kotest-assertions-core:${Versions.KOTEST}")
+    // Kotest 6 を JUnit Platform 経由で実行するランナー (FunSpec 等の Spec を検出)
+    testImplementation("io.kotest:kotest-runner-junit5:${Versions.KOTEST}")
     // Testcontainers 2.x で submodule 名が "testcontainers-*" に統一された
     testImplementation("org.testcontainers:testcontainers:${Versions.TESTCONTAINERS}")
     testImplementation("org.testcontainers:testcontainers-postgresql:${Versions.TESTCONTAINERS}")

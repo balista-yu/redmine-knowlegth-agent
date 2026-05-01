@@ -9,6 +9,7 @@ import ai.koog.prompt.message.ResponseMetaInfo
 import ai.koog.prompt.streaming.StreamFrame
 import com.example.redmineagent.domain.model.ChatMessage
 import com.example.redmineagent.domain.model.ChatRole
+import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.mockk.every
@@ -17,26 +18,23 @@ import io.mockk.slot
 import io.mockk.verify
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.test.runTest
-import org.junit.jupiter.api.Test
 
 /**
  * `KoogChatModel` の単体テスト。`OllamaClient.executeStreaming` をモックして
  * `StreamFrame.TextDelta` のみが `LlmDelta` に射影されることを確認する。
  */
-class KoogChatModelTest {
-    private val ollamaClient = mockk<OllamaClient>()
-    private val llmModel =
-        LLModel(
-            provider = LLMProvider.Ollama,
-            id = "test-model",
-            capabilities = listOf(LLMCapability.Completion),
-        )
-    private val chatModel = KoogChatModel(ollamaClient, llmModel)
+class KoogChatModelTest :
+    FunSpec({
+        val ollamaClient = mockk<OllamaClient>()
+        val llmModel =
+            LLModel(
+                provider = LLMProvider.Ollama,
+                id = "test-model",
+                capabilities = listOf(LLMCapability.Completion),
+            )
+        val chatModel = KoogChatModel(ollamaClient, llmModel)
 
-    @Test
-    fun `TextDelta だけが LlmDelta に変換される (End frame は除外)`() =
-        runTest {
+        test("TextDelta だけが LlmDelta に変換される (End frame は除外)") {
             val frames =
                 listOf(
                     StreamFrame.TextDelta("Hello, ", index = 0),
@@ -56,9 +54,7 @@ class KoogChatModelTest {
             deltas.map { it.text } shouldBe listOf("Hello, ", "world")
         }
 
-    @Test
-    fun `system  user  assistant が順序通り Prompt に積まれる`() =
-        runTest {
+        test("system  user  assistant が順序通り Prompt に積まれる") {
             val promptSlot = slot<Prompt>()
             every {
                 ollamaClient.executeStreaming(capture(promptSlot), any(), any())
@@ -77,4 +73,4 @@ class KoogChatModelTest {
             captured.messages shouldHaveSize 3
             verify(exactly = 1) { ollamaClient.executeStreaming(any(), llmModel, any()) }
         }
-}
+    })

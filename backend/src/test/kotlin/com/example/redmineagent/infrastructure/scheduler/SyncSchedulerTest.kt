@@ -6,60 +6,58 @@ import com.example.redmineagent.domain.model.SyncMode
 import com.example.redmineagent.domain.model.SyncRun
 import com.example.redmineagent.domain.model.SyncRunKind
 import com.example.redmineagent.domain.model.SyncRunStatus
+import io.kotest.core.spec.style.FunSpec
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
-import org.junit.jupiter.api.Test
 import java.time.Instant
 
 /**
  * `SyncScheduler` の単体テスト。`@Scheduled` 経路自体は Spring 統合テストではなく、
  * メソッドを直接呼び出して各 ApplicationService への dispatch と例外時の挙動を検証する。
  */
-class SyncSchedulerTest {
-    private val syncIssues = mockk<SyncIssuesApplicationService>()
-    private val reconcile = mockk<ReconcileApplicationService>()
-    private val scheduler = SyncScheduler(syncIssues, reconcile)
+class SyncSchedulerTest :
+    FunSpec({
+        val syncIssues = mockk<SyncIssuesApplicationService>()
+        val reconcile = mockk<ReconcileApplicationService>()
+        val scheduler = SyncScheduler(syncIssues, reconcile)
 
-    @Test
-    fun `scheduledIncrementalSync は SyncMode INCREMENTAL で execute を呼ぶ`() {
-        coEvery { syncIssues.execute(SyncMode.INCREMENTAL) } returns dummySyncRun(SyncRunKind.INCREMENTAL)
+        fun dummySyncRun(kind: SyncRunKind): SyncRun =
+            SyncRun(
+                id = 1L,
+                kind = kind,
+                startedAt = Instant.parse("2026-01-01T00:00:00Z"),
+                finishedAt = Instant.parse("2026-01-01T00:00:01Z"),
+                ticketsFetched = 0,
+                chunksUpserted = 0,
+                chunksSkipped = 0,
+                ticketsDeleted = 0,
+                status = SyncRunStatus.SUCCESS,
+                errorMessage = null,
+            )
 
-        scheduler.scheduledIncrementalSync()
+        test("scheduledIncrementalSync は SyncMode INCREMENTAL で execute を呼ぶ") {
+            coEvery { syncIssues.execute(SyncMode.INCREMENTAL) } returns dummySyncRun(SyncRunKind.INCREMENTAL)
 
-        coVerify(exactly = 1) { syncIssues.execute(SyncMode.INCREMENTAL) }
-    }
+            scheduler.scheduledIncrementalSync()
 
-    @Test
-    fun `scheduledReconcile は ReconcileApplicationService を呼ぶ`() {
-        coEvery { reconcile.execute() } returns dummySyncRun(SyncRunKind.RECONCILE)
+            coVerify(exactly = 1) { syncIssues.execute(SyncMode.INCREMENTAL) }
+        }
 
-        scheduler.scheduledReconcile()
+        test("scheduledReconcile は ReconcileApplicationService を呼ぶ") {
+            coEvery { reconcile.execute() } returns dummySyncRun(SyncRunKind.RECONCILE)
 
-        coVerify(exactly = 1) { reconcile.execute() }
-    }
+            scheduler.scheduledReconcile()
 
-    @Test
-    fun `ApplicationService の例外は握りつぶし scheduler は throw しない`() {
-        coEvery { syncIssues.execute(any()) } throws RuntimeException("Redmine 503")
+            coVerify(exactly = 1) { reconcile.execute() }
+        }
 
-        // 例外が伝播しないことを確認 (assertion 不要、throw すれば test fail)
-        scheduler.scheduledIncrementalSync()
+        test("ApplicationService の例外は握りつぶし scheduler は throw しない") {
+            coEvery { syncIssues.execute(any()) } throws RuntimeException("Redmine 503")
 
-        coVerify(exactly = 1) { syncIssues.execute(SyncMode.INCREMENTAL) }
-    }
+            // 例外が伝播しないことを確認 (assertion 不要、throw すれば test fail)
+            scheduler.scheduledIncrementalSync()
 
-    private fun dummySyncRun(kind: SyncRunKind): SyncRun =
-        SyncRun(
-            id = 1L,
-            kind = kind,
-            startedAt = Instant.parse("2026-01-01T00:00:00Z"),
-            finishedAt = Instant.parse("2026-01-01T00:00:01Z"),
-            ticketsFetched = 0,
-            chunksUpserted = 0,
-            chunksSkipped = 0,
-            ticketsDeleted = 0,
-            status = SyncRunStatus.SUCCESS,
-            errorMessage = null,
-        )
-}
+            coVerify(exactly = 1) { syncIssues.execute(SyncMode.INCREMENTAL) }
+        }
+    })

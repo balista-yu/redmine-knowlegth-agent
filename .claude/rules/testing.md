@@ -10,18 +10,28 @@ paths:
 
 このルールはテストファイル編集時に自動でロードされる。
 
+## テストフレームワーク
+
+- **既定は Kotest 6 (`FunSpec`)**: 単体テストはすべて `class XxxTest : FunSpec({ ... })` で書く
+  - assertion: `io.kotest.matchers.*` (`shouldBe` / `shouldThrow` / `shouldHaveSize` 等)
+  - mocking: MockK (`io.mockk.*`) と組合せ可
+  - `IsolationMode.InstancePerTest` を `src/test/kotlin/io/kotest/provided/ProjectConfig.kt`
+    で有効化済み (テストごとに spec インスタンス再生成 = JUnit 同等)
+- **Spring を立てるテストのみ JUnit 5 を継続**: `@SpringBootTest` / `@WebMvcTest` 等は
+  Kotest 6 用の Spring extension が未公開のため、引き続き JUnit `@Test` で記述する
+
 ## テスト分類と必須レベル
 
 | 層                              | 種別          | 必須 | 使用ツール                              |
 | ------------------------------- | ------------- | ---- | --------------------------------------- |
-| Domain Service                  | Unit          | ★★★  | JUnit 5 + Kotest assertions              |
-| Application Service             | Unit          | ★★★  | JUnit 5 + MockK + Kotest                 |
-| Infrastructure / web            | Integration   | ★★   | `@WebMvcTest` / `WebTestClient`          |
-| Infrastructure / external/redmine | Integration | ★★   | Testcontainers (`redmine:5` + `mysql:8`) |
-| Infrastructure / external/qdrant  | Integration | ★★   | Testcontainers (`qdrant/qdrant`)         |
+| Domain Service                  | Unit          | ★★★  | Kotest 6 (FunSpec)                       |
+| Application Service             | Unit          | ★★★  | Kotest 6 (FunSpec) + MockK               |
+| Infrastructure / web            | Integration   | ★★   | JUnit 5 + `@WebMvcTest` / `WebTestClient` |
+| Infrastructure / external/redmine | Integration | ★★   | Kotest 6 + Testcontainers (`redmine:5` + `mysql:8`) |
+| Infrastructure / external/qdrant  | Integration | ★★   | Kotest 6 + Testcontainers (`qdrant/qdrant`) |
 | Infrastructure / external/ollama  | -          | ☆    | 外部依存のため作らない (録画 or 手動確認) |
-| Infrastructure / persistence     | Integration | ★★   | Testcontainers (`postgres:16`)           |
-| Architecture                     | Unit (ArchUnit) | ★★★ | ArchUnit                                |
+| Infrastructure / persistence     | Integration | ★★   | JUnit 5 + Testcontainers (`postgres:16`) |
+| Architecture                     | Unit (ArchUnit) | ★★★ | Kotest 6 + ArchUnit                     |
 | Frontend                         | Component    | ★★   | Vitest + Testing Library + MSW            |
 
 ## 命名規約
@@ -30,9 +40,11 @@ paths:
   - 単体テスト: `<対象クラス名>Test.kt` (例: `ChunkBuilderTest.kt`)
   - 統合テスト: `<対象クラス名>IT.kt` (例: `QdrantTicketChunkRepositoryIT.kt`)
   - ArchUnit: `OnionArchitectureTest.kt`
-- メソッド名 (どちらでも可):
-  - 日本語バックティック: `` fun `description が空ならチャンク 0 件`() ``
-  - English: `methodName_条件_期待結果` (例: `build_descriptionEmpty_returnsEmptyList`)
+- テスト名 (FunSpec の `test("...")` 内):
+  - 日本語自由文: `test("description が空ならチャンク 0 件") { ... }`
+  - English: `test("build_descriptionEmpty_returnsEmptyList") { ... }`
+- JUnit 5 を残す Spring テストのみ従来の関数名 + バックティック:
+  - `` fun `走行中なら 409 を返す`() ``
 
 ## テストの基本原則
 
@@ -59,30 +71,26 @@ backend/src/test/kotlin/com/example/redmineagent/domain/service/ChunkBuilderTest
 - **Domain Service は fixture で十分** (純粋関数なのでモック不要なケースが多い)
 
 ```kotlin
-class ChunkBuilderTest {
-    private val chunkBuilder = ChunkBuilder()
-
-    @Test
-    fun `description が空ならチャンク 0 件`() {
+class ChunkBuilderTest : FunSpec({
+    test("description が空ならチャンク 0 件") {
         val issue = IssueFixture.with(description = "", journals = emptyList())
-        val chunks = chunkBuilder.build(issue)
+        val chunks = ChunkBuilder.build(issue)
         chunks shouldHaveSize 0
     }
-}
+})
 ```
 
 ```kotlin
-class SyncIssuesApplicationServiceTest {
-    private val redmineGateway = mockk<RedmineGateway>()
-    private val ticketChunkRepository = mockk<TicketChunkRepository>()
-    // ...
+class SyncIssuesApplicationServiceTest : FunSpec({
+    val redmineGateway = mockk<RedmineGateway>()
+    val ticketChunkRepository = mockk<TicketChunkRepository>()
+    // ... (InstancePerTest なのでテストごとに spec が再生成され、mockk もフレッシュ)
 
-    @Test
-    fun `差分なしの場合 chunks_skipped が増える`() = runTest {
+    test("差分なしの場合 chunks_skipped が増える") {
         coEvery { redmineGateway.listIssuesUpdatedSince(any(), any(), any()) } returns IssuePage(...)
-        // ...
+        // ... suspend 関数を直接呼べる (FunSpec の test{} はコルーチンスコープ)
     }
-}
+})
 ```
 
 ## Infrastructure 統合テスト (Testcontainers)

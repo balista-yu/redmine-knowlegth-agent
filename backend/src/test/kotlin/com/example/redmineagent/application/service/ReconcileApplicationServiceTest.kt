@@ -7,6 +7,7 @@ import com.example.redmineagent.domain.model.SyncRunStatus
 import com.example.redmineagent.domain.repository.SyncStateRepository
 import com.example.redmineagent.domain.repository.TicketChunkRepository
 import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.mockk.Runs
 import io.mockk.coEvery
@@ -14,29 +15,44 @@ import io.mockk.coVerify
 import io.mockk.just
 import io.mockk.mockk
 import io.mockk.slot
-import kotlinx.coroutines.test.runTest
-import org.junit.jupiter.api.Test
 import java.time.Instant
 
 /**
- * `ReconcileApplicationService` の単体テスト (docs/02-tasks.md T-1-11)。MockK で全 Domain
- * interface をモック化し、Spring を立てない (.claude/rules/testing.md)。
+ * `ReconcileApplicationService` の単体テスト (docs/02-tasks.md T-1-11)。
  */
-class ReconcileApplicationServiceTest {
-    private val redmineGateway = mockk<RedmineGateway>()
-    private val ticketChunkRepository = mockk<TicketChunkRepository>()
-    private val syncStateRepository = mockk<SyncStateRepository>()
+class ReconcileApplicationServiceTest :
+    FunSpec({
+        val redmineGateway = mockk<RedmineGateway>()
+        val ticketChunkRepository = mockk<TicketChunkRepository>()
+        val syncStateRepository = mockk<SyncStateRepository>()
+        val service =
+            ReconcileApplicationService(
+                redmineGateway = redmineGateway,
+                ticketChunkRepository = ticketChunkRepository,
+                syncStateRepository = syncStateRepository,
+            )
 
-    private val service =
-        ReconcileApplicationService(
-            redmineGateway = redmineGateway,
-            ticketChunkRepository = ticketChunkRepository,
-            syncStateRepository = syncStateRepository,
-        )
+        fun stubInitialState() {
+            coEvery { syncStateRepository.startRun(SyncRunKind.RECONCILE, any()) } answers {
+                SyncRun(
+                    id = 99L,
+                    kind = SyncRunKind.RECONCILE,
+                    startedAt = secondArg(),
+                    finishedAt = null,
+                    ticketsFetched = 0,
+                    chunksUpserted = 0,
+                    chunksSkipped = 0,
+                    ticketsDeleted = 0,
+                    status = SyncRunStatus.RUNNING,
+                    errorMessage = null,
+                )
+            }
+            coEvery { syncStateRepository.updateLastFullReconcileAt(any<Instant>()) } just Runs
+            coEvery { syncStateRepository.updateTicketsTotal(any()) } just Runs
+            coEvery { syncStateRepository.updateLastError(any()) } just Runs
+        }
 
-    @Test
-    fun `Qdrant にしかない ticket は deleteByTicketId で削除される`() =
-        runTest {
+        test("Qdrant にしかない ticket は deleteByTicketId で削除される") {
             stubInitialState()
             coEvery { redmineGateway.listAllIssueIds() } returns setOf(1, 2, 3)
             coEvery { ticketChunkRepository.listAllTicketIds() } returns setOf(1, 2, 3, 4)
@@ -55,9 +71,7 @@ class ReconcileApplicationServiceTest {
             coVerify { syncStateRepository.updateTicketsTotal(3) }
         }
 
-    @Test
-    fun `Redmine と Qdrant が一致なら deleteByTicketId は呼ばれず ticketsDeleted は 0`() =
-        runTest {
+        test("Redmine と Qdrant が一致なら deleteByTicketId は呼ばれず ticketsDeleted は 0") {
             stubInitialState()
             coEvery { redmineGateway.listAllIssueIds() } returns setOf(10, 20, 30)
             coEvery { ticketChunkRepository.listAllTicketIds() } returns setOf(10, 20, 30)
@@ -70,9 +84,7 @@ class ReconcileApplicationServiceTest {
             coVerify(exactly = 0) { ticketChunkRepository.deleteByTicketId(any()) }
         }
 
-    @Test
-    fun `Redmine 取得失敗なら failRun と last_error 更新で run を failed に記録し例外を伝播する`() =
-        runTest {
+        test("Redmine 取得失敗なら failRun と last_error 更新で run を failed に記録し例外を伝播する") {
             stubInitialState()
             coEvery { redmineGateway.listAllIssueIds() } throws RuntimeException("Redmine 503 after retries")
             val failedSlot = slot<SyncRun>()
@@ -87,24 +99,4 @@ class ReconcileApplicationServiceTest {
             coVerify(exactly = 0) { syncStateRepository.updateLastFullReconcileAt(any()) }
             coVerify(exactly = 0) { ticketChunkRepository.deleteByTicketId(any()) }
         }
-
-    private fun stubInitialState() {
-        coEvery { syncStateRepository.startRun(SyncRunKind.RECONCILE, any()) } answers {
-            SyncRun(
-                id = 99L,
-                kind = SyncRunKind.RECONCILE,
-                startedAt = secondArg(),
-                finishedAt = null,
-                ticketsFetched = 0,
-                chunksUpserted = 0,
-                chunksSkipped = 0,
-                ticketsDeleted = 0,
-                status = SyncRunStatus.RUNNING,
-                errorMessage = null,
-            )
-        }
-        coEvery { syncStateRepository.updateLastFullReconcileAt(any<Instant>()) } just Runs
-        coEvery { syncStateRepository.updateTicketsTotal(any()) } just Runs
-        coEvery { syncStateRepository.updateLastError(any()) } just Runs
-    }
-}
+    })
