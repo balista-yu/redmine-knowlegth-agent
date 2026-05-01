@@ -111,9 +111,23 @@ dependencies {
 // Test (`*Test` suffix = unit) と integrationTest (`*IT` suffix) を分離。
 //   CI の `test` ジョブはユニット限定。Testcontainers 系は `integrationTest` で
 //   Docker daemon があるホストで明示的に走らせる方針 (ローカルおよび手動 CI step)。
+//
+// JVM 25 で grpc-netty-shaded (Qdrant client 経由) が出すランタイム警告を抑制:
+//   - `--enable-native-access=ALL-UNNAMED`: native lib load (System.loadLibrary)
+//   - `-Xshare:off`: bootstrap classpath 追加時の CDS Sharing 警告
+//   - `--sun-misc-unsafe-memory-access=allow`: JEP 471 で導入された
+//     sun.misc.Unsafe::allocateMemory 警告 (Netty 内部) を黙らせる
 // =============================================================================
+val testJvmArgs =
+    listOf(
+        "--enable-native-access=ALL-UNNAMED",
+        "-Xshare:off",
+        "--sun-misc-unsafe-memory-access=allow",
+    )
+
 tasks.test {
     useJUnitPlatform()
+    jvmArgs = testJvmArgs
     filter {
         excludeTestsMatching("*IT")
     }
@@ -129,6 +143,7 @@ tasks.register<Test>("integrationTest") {
     description = "Runs *IT tests (Testcontainers / 外部依存あり)"
     group = "verification"
     useJUnitPlatform()
+    jvmArgs = testJvmArgs
     filter {
         includeTestsMatching("*IT")
     }
