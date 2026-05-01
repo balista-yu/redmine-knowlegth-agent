@@ -24,6 +24,8 @@ hs_err_pid*.log
 node_modules/
 frontend/dist/
 frontend/.vite/
+# TypeScript incremental build output (project references)
+**/tsconfig*.tsbuildinfo
 *.log
 npm-debug.log*
 yarn-debug.log*

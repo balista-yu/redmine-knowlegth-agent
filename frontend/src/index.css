@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+/*
+ * Tailwind v4 は @import "tailwindcss" のみで preflight + utility が読み込まれる。
+ * カスタムテーマは @theme {} ブロックで上書き可能 (本フェーズでは未使用)。
+ */
