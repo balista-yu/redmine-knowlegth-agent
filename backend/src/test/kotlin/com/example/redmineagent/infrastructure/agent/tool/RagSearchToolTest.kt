@@ -7,23 +7,19 @@ import com.example.redmineagent.domain.model.SearchFilter
 import com.example.redmineagent.domain.model.TicketChunk
 import com.example.redmineagent.domain.model.TicketMetadata
 import com.example.redmineagent.domain.repository.TicketChunkRepository
+import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
 import io.mockk.slot
-import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import org.junit.jupiter.api.Test
 
 /**
  * `RagSearchTool` の単体テスト (docs/02-tasks.md T-2-2 DoD)。
@@ -32,14 +28,39 @@ import org.junit.jupiter.api.Test
  *  - 同 ticket_id の複数 chunk hit → 1 件にまとめ、score は最大値
  *  - filter null と filter 指定の両方で正しく Embedding + Repository が呼ばれる
  */
-class RagSearchToolTest {
-    private val embeddingService = mockk<EmbeddingService>()
-    private val ticketChunkRepository = mockk<TicketChunkRepository>()
-    private val tool = RagSearchTool(embeddingService, ticketChunkRepository)
+class RagSearchToolTest :
+    FunSpec({
+        val embeddingService = mockk<EmbeddingService>()
+        val ticketChunkRepository = mockk<TicketChunkRepository>()
+        val tool = RagSearchTool(embeddingService, ticketChunkRepository)
 
-    @Test
-    fun `同 ticket_id の複数 chunk hit は 1 件に集約され score は最大値`() =
-        runTest {
+        fun scored(
+            ticketId: Int,
+            content: String,
+            score: Float,
+        ): ScoredChunk =
+            ScoredChunk(
+                chunk =
+                    TicketChunk(
+                        ticketId = ticketId,
+                        chunkType = ChunkType.DESCRIPTION,
+                        chunkIndex = 0,
+                        subIndex = 0,
+                        content = content,
+                        contentHash = "hash-$ticketId-${content.hashCode()}",
+                    ),
+                metadata =
+                    TicketMetadata(
+                        subject = "subject for $ticketId",
+                        url = "http://redmine.example/issues/$ticketId",
+                        projectName = "proj",
+                        status = "New",
+                        tracker = "Bug",
+                    ),
+                score = score,
+            )
+
+        test("同 ticket_id の複数 chunk hit は 1 件に集約され score は最大値") {
             val vector = floatArrayOf(0.1f, 0.2f, 0.3f)
             coEvery { embeddingService.embed("how to fix tls") } returns vector
             coEvery {
@@ -51,10 +72,7 @@ class RagSearchToolTest {
                     scored(ticketId = 200, content = "another ticket", score = 0.6f),
                 )
 
-            val raw =
-                tool.execute(
-                    RagSearchTool.RagSearchArgs(query = "how to fix tls"),
-                )
+            val raw = tool.execute(RagSearchTool.RagSearchArgs(query = "how to fix tls"))
 
             val items = Json.parseToJsonElement(raw).jsonArray
             items.size shouldBe 2
@@ -67,9 +85,7 @@ class RagSearchToolTest {
             items[1].jsonObject["ticketId"]?.jsonPrimitive?.intOrNull shouldBe 200
         }
 
-    @Test
-    fun `filter 指定なしなら SearchFilter NONE が repository に渡る`() =
-        runTest {
+        test("filter 指定なしなら SearchFilter NONE が repository に渡る") {
             val filterSlot = slot<SearchFilter>()
             coEvery { embeddingService.embed(any()) } returns floatArrayOf(1.0f)
             coEvery {
@@ -82,9 +98,7 @@ class RagSearchToolTest {
             coVerify(exactly = 1) { embeddingService.embed("x") }
         }
 
-    @Test
-    fun `filter projectId と statusFilter が指定されると SearchFilter に反映される`() =
-        runTest {
+        test("filter projectId と statusFilter が指定されると SearchFilter に反映される") {
             val filterSlot = slot<SearchFilter>()
             coEvery { embeddingService.embed(any()) } returns floatArrayOf(1.0f)
             coEvery {
@@ -104,9 +118,7 @@ class RagSearchToolTest {
             filterSlot.captured.tracker shouldBe null
         }
 
-    @Test
-    fun `limit は 1〜20 にクランプされ repository へ渡る`() =
-        runTest {
+        test("limit は 1〜20 にクランプされ repository へ渡る") {
             coEvery { embeddingService.embed(any()) } returns floatArrayOf(1.0f)
             val limitSlot = slot<Int>()
             coEvery {
@@ -117,35 +129,4 @@ class RagSearchToolTest {
 
             limitSlot.captured shouldBe 20
         }
-
-    // ---- helpers --------------------------------------------------------------
-
-    private fun scored(
-        ticketId: Int,
-        content: String,
-        score: Float,
-    ): ScoredChunk =
-        ScoredChunk(
-            chunk =
-                TicketChunk(
-                    ticketId = ticketId,
-                    chunkType = ChunkType.DESCRIPTION,
-                    chunkIndex = 0,
-                    subIndex = 0,
-                    content = content,
-                    contentHash = "hash-$ticketId-${content.hashCode()}",
-                ),
-            metadata =
-                TicketMetadata(
-                    subject = "subject for $ticketId",
-                    url = "http://redmine.example/issues/$ticketId",
-                    projectName = "proj",
-                    status = "New",
-                    tracker = "Bug",
-                ),
-            score = score,
-        )
-
-    @Suppress("unused") // 将来的な追加 assert で利用するため named imports は維持
-    private fun referencedJsonHelpers(): List<Any> = listOf(JsonArray(emptyList()), JsonObject(emptyMap()), JsonPrimitive(0))
-}
+    })

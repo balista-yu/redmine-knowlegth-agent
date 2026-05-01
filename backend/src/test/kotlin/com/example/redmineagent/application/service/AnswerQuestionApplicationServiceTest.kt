@@ -5,6 +5,7 @@ import com.example.redmineagent.domain.model.AgentEvent
 import com.example.redmineagent.domain.model.ChatMessage
 import com.example.redmineagent.domain.model.ChatRole
 import com.example.redmineagent.domain.repository.ConversationHistoryRepository
+import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -14,17 +15,14 @@ import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
 import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.test.runTest
-import org.junit.jupiter.api.Test
 
-class AnswerQuestionApplicationServiceTest {
-    private val agent = mockk<AIAgent<String, String>>()
-    private val history = mockk<ConversationHistoryRepository>(relaxed = true)
-    private val service = AnswerQuestionApplicationService(agent, history)
+class AnswerQuestionApplicationServiceTest :
+    FunSpec({
+        val agent = mockk<AIAgent<String, String>>()
+        val history = mockk<ConversationHistoryRepository>(relaxed = true)
+        val service = AnswerQuestionApplicationService(agent, history)
 
-    @Test
-    fun `正常系 - Delta と Done が順に発行され履歴に user assistant が追記される`() =
-        runTest {
+        test("正常系 - Delta と Done が順に発行され履歴に user assistant が追記される") {
             coEvery { agent.run("hello") } returns "hi there"
             val cidSlot = slot<String>()
             val msgSlot = slot<ChatMessage>()
@@ -39,9 +37,7 @@ class AnswerQuestionApplicationServiceTest {
             verify(exactly = 2) { history.append(any(), any()) }
         }
 
-    @Test
-    fun `conversationId が null なら UUID が採番されて履歴に保存される`() =
-        runTest {
+        test("conversationId が null なら UUID が採番されて履歴に保存される") {
             coEvery { agent.run(any()) } returns "ok"
             val cidSlot = slot<String>()
             every { history.append(capture(cidSlot), any()) } returns Unit
@@ -53,9 +49,7 @@ class AnswerQuestionApplicationServiceTest {
             cidSlot.captured shouldBe cidSlot.captured.lowercase()
         }
 
-    @Test
-    fun `Ollama 接続失敗の例外は OLLAMA_UNAVAILABLE Error イベントに変換される`() =
-        runTest {
+        test("Ollama 接続失敗の例外は OLLAMA_UNAVAILABLE Error イベントに変換される") {
             coEvery { agent.run(any()) } throws RuntimeException("connection refused: ollama unreachable")
 
             val events = service.execute("hello", conversationId = "c-2").toList()
@@ -65,9 +59,7 @@ class AnswerQuestionApplicationServiceTest {
             error.code shouldBe "OLLAMA_UNAVAILABLE"
         }
 
-    @Test
-    fun `その他例外は INTERNAL Error イベントに変換される`() =
-        runTest {
+        test("その他例外は INTERNAL Error イベントに変換される") {
             coEvery { agent.run(any()) } throws RuntimeException("something went wrong")
 
             val events = service.execute("hello", conversationId = "c-3").toList()
@@ -75,9 +67,7 @@ class AnswerQuestionApplicationServiceTest {
             (events.single() as AgentEvent.Error).code shouldBe "INTERNAL"
         }
 
-    @Test
-    fun `エラー時も user メッセージは履歴に保存されるが assistant は保存されない`() =
-        runTest {
+        test("エラー時も user メッセージは履歴に保存されるが assistant は保存されない") {
             coEvery { agent.run(any()) } throws RuntimeException("boom")
             val msgs = mutableListOf<ChatMessage>()
             every { history.append(any(), capture(msgs)) } returns Unit
@@ -88,4 +78,4 @@ class AnswerQuestionApplicationServiceTest {
             msgs shouldHaveSize 1
             msgs[0].role shouldBe ChatRole.USER
         }
-}
+    })
