@@ -14,11 +14,14 @@ import type {
  * .claude/rules/frontend.md の推奨パターン (`EventSource` ではなく `fetch` を使う)。
  * SSE 形式は "event: <name>\ndata: <json>\n\n" のフレームを期待する
  * (docs/03-api-spec.md §1 と Spring の `ServerSentEvent` フォーマット)。
+ *
+ * 多重送信防止は呼び出し側 (`ChatPage`) のボタン disabled で完結するため、
+ * AbortSignal は受け取らない (Node 24 の undici fetch が jsdom の AbortSignal を
+ * `instanceof` で拒否するテスト互換性問題を回避するため)。
  */
 export async function* streamChat(
   message: string,
   conversationId?: string,
-  signal?: AbortSignal,
 ): AsyncGenerator<ChatStreamEvent> {
   const res = await fetch("/api/chat", {
     method: "POST",
@@ -27,7 +30,6 @@ export async function* streamChat(
       Accept: "text/event-stream",
     },
     body: JSON.stringify({ message, conversationId: conversationId ?? null }),
-    signal,
   });
   if (!res.ok) {
     throw new ChatStreamHttpError(res.status, await safeReadText(res));

@@ -1,4 +1,4 @@
-import { useCallback, useReducer, useRef } from "react";
+import { useCallback, useReducer } from "react";
 import { streamChat, ChatStreamHttpError } from "./api/chatStream";
 import { MessageInput } from "./components/MessageInput";
 import { MessageList } from "./components/MessageList";
@@ -76,15 +76,11 @@ function reducer(state: ChatState, action: ChatAction): ChatState {
  */
 export function ChatPage() {
   const [state, dispatch] = useReducer(reducer, initialState);
-  const abortRef = useRef<AbortController | null>(null);
 
   const handleSubmit = useCallback(
     (message: string) => {
-      // 既存ストリームがあれば abort (理論上発生しないが安全のため)
-      abortRef.current?.abort();
-      const controller = new AbortController();
-      abortRef.current = controller;
-
+      // 多重送信は MessageInput 側で送信ボタン disabled にして防いでいるため、
+      // ここでは AbortController による途中キャンセルは行わない。
       dispatch({ type: "SUBMIT", userMessage: message });
 
       void (async () => {
@@ -92,12 +88,10 @@ export function ChatPage() {
           for await (const event of streamChat(
             message,
             state.conversationId ?? undefined,
-            controller.signal,
           )) {
             applyEvent(event, dispatch);
           }
         } catch (err) {
-          if (controller.signal.aborted) return;
           dispatch({ type: "ERROR", message: errorMessage(err) });
         }
       })();
