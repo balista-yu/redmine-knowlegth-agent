@@ -74,3 +74,10 @@ app:
   sync:
     cron: ${SYNC_CRON:0 0 * * * *}
     reconcile-cron: ${RECONCILE_CRON:0 0 3 * * SUN}
+
+  agent:
+    # Koog AIAgent に渡す system prompt (RAG エージェント用)
+    system-prompt: ${AGENT_SYSTEM_PROMPT:あなたは Redmine のチケットを参照して質問に答えるアシスタントです。関連する過去事例があれば ragSearch ツールを呼び出して根拠を確認したうえで、回答に引用元のチケット ID を含めてください。}
+    temperature: ${AGENT_TEMPERATURE:0.3}
+    # AIAgent の 1 セッションあたり最大ステップ数 (LLM ↔ tool ループの上限)
+    max-iterations: ${AGENT_MAX_ITERATIONS:10}
