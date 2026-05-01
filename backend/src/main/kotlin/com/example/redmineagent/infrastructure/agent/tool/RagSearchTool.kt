@@ -1,10 +1,10 @@
 package com.example.redmineagent.infrastructure.agent.tool
 
 import ai.koog.agents.core.tools.SimpleTool
-import ai.koog.agents.core.tools.ToolArgs
 import ai.koog.agents.core.tools.ToolDescriptor
 import ai.koog.agents.core.tools.ToolParameterDescriptor
 import ai.koog.agents.core.tools.ToolParameterType
+import ai.koog.serialization.typeToken
 import com.example.redmineagent.domain.gateway.EmbeddingService
 import com.example.redmineagent.domain.model.ScoredChunk
 import com.example.redmineagent.domain.model.SearchFilter
@@ -37,7 +37,7 @@ class RagSearchTool(
     private val embeddingService: EmbeddingService,
     private val ticketChunkRepository: TicketChunkRepository,
 ) : SimpleTool<RagSearchTool.RagSearchArgs>(
-        argsSerializer = RagSearchArgs.serializer(),
+        argsType = typeToken<RagSearchArgs>(),
         name = TOOL_NAME,
         description = TOOL_DESCRIPTION,
     ) {
@@ -47,7 +47,7 @@ class RagSearchTool(
         val projectId: Int? = null,
         val statusFilter: String? = null,
         val limit: Int = DEFAULT_LIMIT,
-    ) : ToolArgs
+    )
 
     override suspend fun execute(args: RagSearchArgs): String {
         val effectiveLimit = args.limit.coerceIn(1, MAX_LIMIT)

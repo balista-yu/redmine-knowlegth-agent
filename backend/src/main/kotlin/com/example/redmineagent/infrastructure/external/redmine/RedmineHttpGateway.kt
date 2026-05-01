@@ -4,18 +4,17 @@ import com.example.redmineagent.domain.gateway.RedmineGateway
 import com.example.redmineagent.domain.model.IssuePage
 import com.example.redmineagent.infrastructure.external.redmine.dto.IssueListResponseDto
 import com.example.redmineagent.infrastructure.external.redmine.mapper.toDomain
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
-import com.fasterxml.jackson.module.kotlin.kotlinModule
 import kotlinx.coroutines.reactor.awaitSingle
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
-import org.springframework.http.codec.json.Jackson2JsonDecoder
+import org.springframework.http.codec.json.JacksonJsonDecoder
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.WebClientResponseException
 import reactor.util.retry.Retry
+import tools.jackson.databind.json.JsonMapper
+import tools.jackson.module.kotlin.kotlinModule
 import java.time.Duration
 import java.time.Instant
 import java.time.format.DateTimeFormatter
@@ -34,19 +33,21 @@ class RedmineHttpGateway(
 ) : RedmineGateway {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
-    // Spring Boot 4.0 で ObjectMapper bean の autowire が状況により失敗する case を踏まえ
-    // 自前で構成する (Kotlin module + JavaTime module を明示登録、他に拡張不要のため)
-    private val objectMapper: ObjectMapper =
-        ObjectMapper()
-            .registerModule(kotlinModule())
-            .registerModule(JavaTimeModule())
+    // Spring Boot 4.0 では Spring Web の codecs が tools.jackson 系 (Jackson 3.x) に移行。
+    // ObjectMapper bean の autowire は状況により不安定なので、Kotlin module を明示した
+    // JsonMapper を自前で構成する (java.time は Jackson 3.x core でデフォルトサポート済み)
+    private val jsonMapper: JsonMapper =
+        JsonMapper
+            .builder()
+            .addModule(kotlinModule())
+            .build()
 
     private val client: WebClient =
         WebClient
             .builder()
             .baseUrl(baseUrl)
             .defaultHeader(API_KEY_HEADER, apiKey)
-            .codecs { it.defaultCodecs().jackson2JsonDecoder(Jackson2JsonDecoder(objectMapper)) }
+            .codecs { it.defaultCodecs().jacksonJsonDecoder(JacksonJsonDecoder(jsonMapper)) }
             .build()
 
     override suspend fun listIssuesUpdatedSince(
