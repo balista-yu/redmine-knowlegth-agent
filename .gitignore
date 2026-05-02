@@ -37,3 +37,7 @@ coverage/
 
 # Devcontainer (本リポジトリ管理外)
 .devcontainer/
+
+# custom
+*.override.yaml
+*.override.yml
