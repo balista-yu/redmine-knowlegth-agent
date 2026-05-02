@@ -1,0 +1,42 @@
+# =============================================================================
+# compose.override.yaml.example
+# =============================================================================
+# このファイルは「Ollama を別リポジトリの compose で起動しているとき」に backend を
+# その Ollama ネットワークに参加させるためのサンプル。
+#
+# 使い方:
+#   1. 本ファイルを `compose.override.yaml` にコピー (.gitignore で git 管理外)
+#        cp compose.override.yaml.example compose.override.yaml
+#   2. Ollama 側の compose プロジェクトで定義されているネットワーク名に書き換え
+#        (デフォルトでは `<ollama-dir>_default` になっていることが多い)
+#   3. Ollama コンテナの hostname (compose 内のサービス名) を OLLAMA_BASE_URL に設定
+#        例: .env で OLLAMA_BASE_URL=http://ollama:11434
+#   4. `task up` で起動
+#
+# `compose.override.yaml` は docker compose が自動マージするので追加引数は不要。
+# 単発で除外したい場合は `docker compose -f compose.yaml up` を使う。
+#
+# 既存の host.docker.internal 経由で Ollama に接続できているなら本 override は不要。
+# (Linux + ホスト直起動 Ollama の場合の最小構成は本 override なしで動く)
+# =============================================================================
+services:
+  backend:
+    networks:
+      - default
+      - ollama-net
+    # ホストの Ollama ではなく、コンテナ間ネットワーク上の Ollama を見るので
+    # OLLAMA_BASE_URL も上書きしておく
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+
+# Ollama 側 compose プロジェクトの default ネットワーク (= 既存の bridge) を
+# external として参照する。`name` は実際の Ollama 側ネットワーク名に合わせる。
+# Ollama 側 compose に
+#   networks:
+#     default:
+#       name: ollama-host
+# のように固定名を付与しておくと連携が安定する。
+networks:
+  ollama-net:
+    external: true
+    name: ollama-host
