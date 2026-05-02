@@ -39,6 +39,20 @@ ollama pull nomic-embed-text     # Embedding
 
 別モデルを使いたい場合は `.env` の `OLLAMA_LLM_MODEL` / `OLLAMA_EMBED_MODEL` を上書きする。
 
+### Ollama を別リポジトリの compose で動かしている場合
+
+ホストインストール (`host.docker.internal` 経由) ではなく Ollama を別 compose
+プロジェクトで起動している場合は、`compose.override.yaml.example` をコピーして
+ネットワークを共有する:
+
+```bash
+cp compose.override.yaml.example compose.override.yaml
+# 中の external network 名を Ollama 側のものに書き換え
+# OLLAMA_BASE_URL=http://ollama:11434 を .env に設定
+```
+
+`compose.override.yaml` は git 管理外 (`.gitignore` 済) なので環境ごとの差は本ファイルに閉じ込める。
+
 ## 環境構築 (初回セットアップ)
 
 ### 1. リポジトリ取得

@@ -202,3 +202,20 @@ volumes:
   redmine-files:
   backend-gradle-cache:
   frontend-node-modules:
+
+# =============================================================================
+# ネットワーク
+# =============================================================================
+# default ネットワーク名を `redmine-knowledge-agent` 固定にする
+# (compose プロジェクト名 prefix `<dirname>_default` を避けるため)。
+# 別 compose プロジェクト (例: 別リポジトリで管理する Ollama コンテナ) から
+# `external: true` で参照して同一ネットワーク上に参加できる。
+#
+# 本リポジトリ側で Ollama 用ホスト名を解決したい場合は compose.override.yaml で
+# extra_hosts ではなく `services.backend.networks` に Ollama 側ネットワークを
+# 追加する方法もある (compose.override.yaml.example を参照)。
+# =============================================================================
+networks:
+  default:
+    name: redmine-knowledge-agent
+    driver: bridge
