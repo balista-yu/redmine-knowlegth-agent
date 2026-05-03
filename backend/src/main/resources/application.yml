@@ -59,7 +59,7 @@ logging:
 app:
   ollama:
     base-url: ${OLLAMA_BASE_URL:http://host.docker.internal:11434}
-    llm-model: ${OLLAMA_LLM_MODEL:qwen2.5:7b}
+    llm-model: ${OLLAMA_LLM_MODEL:qwen3.5:9b}
     embed-model: ${OLLAMA_EMBED_MODEL:nomic-embed-text}
 
   redmine:

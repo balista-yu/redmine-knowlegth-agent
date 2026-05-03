@@ -33,7 +33,7 @@ Redmine のチケットを RAG ナレッジ源とする AI エージェント (K
 ### Ollama 用モデルの取得 (ホスト側で 1 回だけ)
 
 ```bash
-ollama pull qwen2.5:7b           # チャット LLM
+ollama pull qwen3.5:9b           # チャット LLM
 ollama pull nomic-embed-text     # Embedding
 ```
 
