@@ -1,25 +1,43 @@
 package com.example.redmineagent.infrastructure.external.ollama
 
-import ai.koog.embeddings.base.Embedder
-import ai.koog.embeddings.base.Vector
 import com.example.redmineagent.application.exception.EmbeddingTooLongException
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
-import io.mockk.coEvery
-import io.mockk.mockk
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
 
 /**
- * Ollama 統合テストは作らない方針 (T-1-8 テスト要件)。
- * 例外変換ロジックのみ MockK で検証する。
+ * `/api/embed` を叩く HTTP 実装のテスト。
+ *  - レスポンス DTO が新形式 (`embeddings: [[...]]`) を期待することを検証
+ *  - 入力長超過 (HTTP 500 + メッセージ) → `EmbeddingTooLongException` 変換を検証
+ *
+ * MockWebServer (okhttp3) でローカル port を立ててリクエスト/レスポンスを差し替える。
  */
 class OllamaEmbeddingServiceTest :
     FunSpec({
-        val embedder: Embedder = mockk()
-        val service = OllamaEmbeddingService(embedder)
+        lateinit var server: MockWebServer
+        lateinit var service: OllamaEmbeddingService
 
-        test("通常応答は List Double を FloatArray に変換して返す") {
-            coEvery { embedder.embed("hello") } returns Vector(listOf(0.1, 0.2, 0.3))
+        beforeTest {
+            server = MockWebServer().apply { start() }
+            service =
+                OllamaEmbeddingService(
+                    baseUrl = server.url("/").toString().trimEnd('/'),
+                    modelName = "test-embed-model",
+                )
+        }
+
+        afterTest {
+            server.shutdown()
+        }
+
+        test("embeddings 配列の先頭ベクトルを FloatArray に変換して返す") {
+            server.enqueue(
+                MockResponse()
+                    .setHeader("Content-Type", "application/json")
+                    .setBody("""{"model":"test-embed-model","embeddings":[[0.1,0.2,0.3]]}"""),
+            )
 
             val result = service.embed("hello")
 
@@ -28,30 +46,60 @@ class OllamaEmbeddingServiceTest :
             result[2] shouldBe 0.3f
         }
 
-        test("context length 超過メッセージを含む例外は EmbeddingTooLongException に変換") {
-            coEvery { embedder.embed(any()) } throws RuntimeException("input length exceeds maximum context length")
+        test("/api/embed に POST し model と input を JSON で送る") {
+            server.enqueue(
+                MockResponse()
+                    .setHeader("Content-Type", "application/json")
+                    .setBody("""{"embeddings":[[0.5]]}"""),
+            )
+
+            service.embed("hello")
+
+            val recorded = server.takeRequest()
+            recorded.method shouldBe "POST"
+            recorded.path shouldBe "/api/embed"
+            val body = recorded.body.readUtf8()
+            (body.contains("\"model\":\"test-embed-model\"")) shouldBe true
+            (body.contains("\"input\":\"hello\"")) shouldBe true
+        }
+
+        test("HTTP 500 + context length 超過メッセージは EmbeddingTooLongException に変換") {
+            server.enqueue(
+                MockResponse()
+                    .setResponseCode(500)
+                    .setHeader("Content-Type", "application/json")
+                    .setBody("""{"error":"input length exceeds maximum context length"}"""),
+            )
 
             shouldThrow<EmbeddingTooLongException> {
                 service.embed("very long text")
             }
         }
 
-        test("他のメッセージの例外はそのまま投げる") {
-            coEvery { embedder.embed(any()) } throws RuntimeException("connection refused")
+        test("HTTP 500 + 他メッセージはそのまま投げる (EmbeddingTooLongException ではない)") {
+            server.enqueue(
+                MockResponse()
+                    .setResponseCode(500)
+                    .setHeader("Content-Type", "application/json")
+                    .setBody("""{"error":"unrelated server error"}"""),
+            )
 
-            shouldThrow<RuntimeException> {
-                service.embed("anything")
-            }.let { thrown ->
-                (thrown is EmbeddingTooLongException) shouldBe false
-            }
+            val thrown =
+                shouldThrow<RuntimeException> {
+                    service.embed("anything")
+                }
+            (thrown is EmbeddingTooLongException) shouldBe false
         }
 
-        test("cause に context length メッセージがあっても変換される (chain 探索)") {
-            val cause = RuntimeException("token limit exceeded")
-            coEvery { embedder.embed(any()) } throws RuntimeException("upstream call failed", cause)
+        test("embeddings 配列が空ならエラー") {
+            server.enqueue(
+                MockResponse()
+                    .setHeader("Content-Type", "application/json")
+                    .setBody("""{"embeddings":[]}"""),
+            )
 
-            shouldThrow<EmbeddingTooLongException> {
-                service.embed("anything")
+            shouldThrow<IllegalStateException> {
+                service.embed("hello")
             }
         }
     })
