@@ -98,6 +98,21 @@ class RedmineHttpGatewayTest :
             path shouldContain "updated_on=%3E%3D2026-04-29T00:00:00Z"
         }
 
+        test("since にサブ秒精度が含まれても秒精度に切り詰めて送る (Redmine が 422 を返さないように)") {
+            server.enqueue(MockResponse().setBody(EMPTY_ISSUES_JSON).setHeader("Content-Type", "application/json"))
+
+            gateway.listIssuesUpdatedSince(
+                // マイクロ秒・ナノ秒を含む Instant
+                since = java.time.Instant.parse("2026-05-03T02:47:31.049032Z"),
+                offset = 0,
+                limit = 100,
+            )
+
+            val path = server.takeRequest().path ?: ""
+            // .049032 が落ちた秒精度のみで送られる
+            path shouldContain "updated_on=%3E%3D2026-05-03T02:47:31Z"
+        }
+
         test("JSON 応答を IssuePage に正しくマップする") {
             server.enqueue(
                 MockResponse()

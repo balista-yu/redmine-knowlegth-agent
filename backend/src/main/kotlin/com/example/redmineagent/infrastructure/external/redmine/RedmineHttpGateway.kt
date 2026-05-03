@@ -18,6 +18,7 @@ import tools.jackson.module.kotlin.kotlinModule
 import java.time.Duration
 import java.time.Instant
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 
 /**
  * `RedmineGateway` の Spring `WebClient` 実装。
@@ -88,7 +89,9 @@ class RedmineHttpGateway(
                     .queryParam("offset", offset)
                     .apply {
                         if (since != null) {
-                            queryParam("updated_on", ">=" + DateTimeFormatter.ISO_INSTANT.format(since))
+                            // Redmine REST は updated_on のサブ秒精度を受け付けず 422 を返すため秒精度に切り詰める
+                            val truncated = since.truncatedTo(ChronoUnit.SECONDS)
+                            queryParam("updated_on", ">=" + DateTimeFormatter.ISO_INSTANT.format(truncated))
                         }
                     }.build()
             }.header(HttpHeaders.ACCEPT, "application/json")

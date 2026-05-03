@@ -73,8 +73,11 @@ dependencies {
 
     // --- Koog (AI agent + RAG + Ollama) --------------------------------------
     // Koog 0.8.x の実アーティファクト名 (multiplatform。Gradle が JVM 派生を解決する)
+    // 注: embeddings-llm は意図的に未依存。Koog 0.8.0 の OllamaClient.embed は
+    //     旧 /api/embeddings を叩くがレスポンス DTO は新形式を期待しており壊れているため、
+    //     OllamaEmbeddingService が Spring WebClient で直接 /api/embed を叩く実装を持つ。
+    //     upstream main で #1854 / #1885 修正済み。次回バージョンアップ時に再依存を検討。
     implementation("ai.koog:koog-agents-jvm:${Versions.KOOG}")
-    implementation("ai.koog:embeddings-llm:${Versions.KOOG}")
     implementation("ai.koog:rag-vector:${Versions.KOOG}")
     implementation("ai.koog:prompt-executor-ollama-client:${Versions.KOOG}")
 

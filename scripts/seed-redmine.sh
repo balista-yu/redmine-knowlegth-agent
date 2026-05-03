@@ -54,7 +54,28 @@ api() {
   fi
 }
 
-# 既存 project 確認 + なければ作成
+# Redmine の tracker / status / priority マスタが投入済みか確認する。
+# 初回起動直後はこれらが空で、issue 作成時に「トラッカー/優先度/ステータスを入力してください」
+# エラーになるため、明確なメッセージで止めて手動投入を促す。
+ensure_default_data() {
+  local trackers
+  trackers=$(api GET "/trackers.json")
+  if echo "$trackers" | grep -q '"trackers":\[\]'; then
+    cat >&2 <<'EOF'
+[seed-redmine] Redmine の tracker / status / priority マスタが空です。
+  デフォルト設定をロードしてから再実行してください:
+
+    docker exec rka-redmine bundle exec rake redmine:load_default_data REDMINE_LANG=ja RAILS_ENV=production
+
+  (または Redmine UI: 管理 → デフォルト設定をロード)
+EOF
+    exit 1
+  fi
+}
+
+# 既存 project 確認 + なければ作成 (tracker_ids を明示しないとプロジェクト側で
+# tracker が無効化され、issue 作成が「トラッカーを入力してください」で失敗するため
+# 1=Bug 2=Feature 3=Support を必ず有効化する)
 ensure_project() {
   local existing
   existing=$(api GET "/projects/${PROJECT_IDENTIFIER}.json" 2>/dev/null || true)
@@ -64,7 +85,7 @@ ensure_project() {
   fi
   echo "[seed-redmine] creating project '${PROJECT_IDENTIFIER}'..."
   api POST "/projects.json" "$(cat <<EOF
-{"project":{"identifier":"${PROJECT_IDENTIFIER}","name":"${PROJECT_NAME}","description":"Redmine Knowledge Agent の動作確認用 seed データ。Bug / Task / Feature が混在し、journal 付き issue も含まれる。","is_public":true}}
+{"project":{"identifier":"${PROJECT_IDENTIFIER}","name":"${PROJECT_NAME}","description":"Redmine Knowledge Agent の動作確認用 seed データ。Bug / Task / Feature が混在し、journal 付き issue も含まれる。","is_public":true,"tracker_ids":[1,2,3]}}
 EOF
 )" >/dev/null
 }
@@ -106,6 +127,7 @@ EOF
 main() {
   echo "[seed-redmine] target: ${REDMINE_BASE_URL}"
 
+  ensure_default_data
   ensure_project
 
   echo "[seed-redmine] creating sample issues..."
