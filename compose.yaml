@@ -32,6 +32,9 @@ services:
       - "5173:5173"
     environment:
       VITE_API_BASE_URL: /api
+      # vite dev server の proxy 転送先。コンテナ内では backend サービス名で解決する必要がある
+      # (vite.config.ts のフォールバック http://localhost:8080 はホスト直起動用)
+      VITE_BACKEND_URL: http://backend:8080
     volumes:
       - ./frontend:/app
       - frontend-node-modules:/app/node_modules
