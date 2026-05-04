@@ -1,6 +1,8 @@
 package com.example.redmineagent.application.service
 
 import ai.koog.agents.core.agent.AIAgent
+import com.example.redmineagent.application.exception.OllamaUnavailableException
+import com.example.redmineagent.application.exception.QdrantUnavailableException
 import com.example.redmineagent.domain.model.AgentEvent
 import com.example.redmineagent.domain.model.ChatMessage
 import com.example.redmineagent.domain.model.ChatRole
@@ -47,31 +49,31 @@ class AnswerQuestionApplicationService(
         flow {
             val cid = conversationId ?: UUID.randomUUID().toString()
             conversationHistory.append(cid, ChatMessage(ChatRole.USER, message))
-            // Koog/Ollama/Qdrant 由来の任意例外を Error イベントに統一変換するため Exception で受ける
-            @Suppress("TooGenericExceptionCaught")
+            // Koog 経由の Ollama / Qdrant 例外は Infrastructure 層で
+            // OllamaUnavailableException / QdrantUnavailableException に変換済み。
+            // ここでは RuntimeException で受けて、`is` 判定で API エラーコードに振り分ける。
             try {
                 val response = agent.run(message)
                 emit(AgentEvent.Delta(response))
                 conversationHistory.append(cid, ChatMessage(ChatRole.ASSISTANT, response))
                 emit(AgentEvent.Done)
-            } catch (e: Exception) {
+            } catch (
+                @Suppress("TooGenericExceptionCaught") e: RuntimeException,
+            ) {
                 logger.warn("Agent execution failed: cid={}, error={}", cid, e.message, e)
                 emit(toErrorEvent(e))
             }
         }
 
     /**
-     * Infrastructure (SDK) 例外 → API エラーコードへのマッピング (docs/03-api-spec.md §1)。
-     * 例外メッセージから簡易判定 — 本来は SDK 例外型で分岐したいが、Koog は
-     * RuntimeException を直に投げる場合があるためメッセージベースで判定する。
+     * Infrastructure 由来の例外型を API エラーコード (docs/03-api-spec.md §1) に振り分ける。
+     * 型ベースのため SDK / メッセージ表記の揺れに依存せず堅牢。
      */
-    @Suppress("TooGenericExceptionCaught", "ReturnCount")
-    private fun toErrorEvent(e: Exception): AgentEvent.Error {
-        val msg = e.message.orEmpty().lowercase()
+    private fun toErrorEvent(e: RuntimeException): AgentEvent.Error {
         val code =
-            when {
-                "ollama" in msg || "connection refused" in msg -> CODE_OLLAMA_UNAVAILABLE
-                "qdrant" in msg -> CODE_QDRANT_UNAVAILABLE
+            when (e) {
+                is OllamaUnavailableException -> CODE_OLLAMA_UNAVAILABLE
+                is QdrantUnavailableException -> CODE_QDRANT_UNAVAILABLE
                 else -> CODE_INTERNAL
             }
         return AgentEvent.Error(code = code, message = e.message ?: e::class.java.simpleName)

@@ -1,5 +1,6 @@
 package com.example.redmineagent.infrastructure.external.qdrant
 
+import com.example.redmineagent.application.exception.QdrantUnavailableException
 import com.example.redmineagent.domain.model.ChunkType
 import com.example.redmineagent.domain.model.ScoredChunk
 import com.example.redmineagent.domain.model.SearchFilter
@@ -7,6 +8,7 @@ import com.example.redmineagent.domain.model.TicketChunk
 import com.example.redmineagent.domain.model.TicketChunkVector
 import com.example.redmineagent.domain.model.TicketMetadata
 import com.example.redmineagent.domain.repository.TicketChunkRepository
+import io.grpc.StatusRuntimeException
 import io.qdrant.client.ConditionFactory.matchKeyword
 import io.qdrant.client.PointIdFactory.id
 import io.qdrant.client.QdrantClient
@@ -30,6 +32,7 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Lazy
 import org.springframework.stereotype.Repository
 import java.time.Duration
+import java.util.concurrent.ExecutionException
 import io.qdrant.client.grpc.JsonWithInt.Value as JsonValue
 
 /**
@@ -96,7 +99,7 @@ class QdrantTicketChunkRepository(
 
     override suspend fun upsert(vectors: List<TicketChunkVector>) {
         if (vectors.isEmpty()) return
-        withContext(Dispatchers.IO) {
+        runQdrant("upsert") {
             vectors.chunked(UPSERT_BATCH_SIZE).forEach { batch ->
                 client.upsertAsync(collectionName, batch.map { it.toPoint() }).get()
             }
@@ -104,7 +107,7 @@ class QdrantTicketChunkRepository(
     }
 
     override suspend fun findByTicketId(ticketId: Int): List<TicketChunk> =
-        withContext(Dispatchers.IO) {
+        runQdrant("findByTicketId") {
             val request =
                 ScrollPoints
                     .newBuilder()
@@ -125,7 +128,7 @@ class QdrantTicketChunkRepository(
         limit: Int,
         filter: SearchFilter,
     ): List<ScoredChunk> =
-        withContext(Dispatchers.IO) {
+        runQdrant("search") {
             val builder =
                 SearchPoints
                     .newBuilder()
@@ -142,7 +145,7 @@ class QdrantTicketChunkRepository(
         }
 
     override suspend fun deleteByTicketId(ticketId: Int) {
-        withContext(Dispatchers.IO) {
+        runQdrant("deleteByTicketId") {
             client.deleteAsync(collectionName, byTicketIdFilter(ticketId)).get()
         }
     }
@@ -159,7 +162,7 @@ class QdrantTicketChunkRepository(
         val orphans =
             existing.filter { Triple(it.chunkType, it.chunkIndex, it.subIndex) !in validKeys }
         if (orphans.isEmpty()) return 0
-        withContext(Dispatchers.IO) {
+        runQdrant("deleteOrphanChunks") {
             val ids: List<PointId> = orphans.map { id(PointIdGenerator.pointId(it)) }
             client.deleteAsync(collectionName, ids).get()
         }
@@ -167,7 +170,7 @@ class QdrantTicketChunkRepository(
     }
 
     override suspend fun listAllTicketIds(): Set<Int> =
-        withContext(Dispatchers.IO) {
+        runQdrant("listAllTicketIds") {
             val ids = mutableSetOf<Int>()
             var nextOffset: PointId? = null
             while (true) {
@@ -188,6 +191,49 @@ class QdrantTicketChunkRepository(
             }
             ids
         }
+
+    /**
+     * Qdrant gRPC 呼び出しを `Dispatchers.IO` で実行し、connection / 5xx 系の例外を
+     * `QdrantUnavailableException` に統一変換する。
+     *
+     * ListenableFuture の `.get()` は `ExecutionException` で gRPC 例外を包むため、
+     * cause チェーンを辿って `StatusRuntimeException` を識別する。
+     */
+    @Suppress("TooGenericExceptionCaught")
+    private suspend fun <T> runQdrant(
+        op: String,
+        block: () -> T,
+    ): T =
+        withContext(Dispatchers.IO) {
+            try {
+                block()
+            } catch (e: ExecutionException) {
+                throw wrapAsUnavailable(op, e.cause ?: e)
+            } catch (e: StatusRuntimeException) {
+                throw wrapAsUnavailable(op, e)
+            } catch (e: RuntimeException) {
+                // ListenableFuture を経由しない直接呼び出しなど。cause が gRPC ならラップ
+                if (e is QdrantUnavailableException) throw e
+                if (isGrpcCause(e)) throw wrapAsUnavailable(op, e)
+                throw e
+            }
+        }
+
+    private fun isGrpcCause(e: Throwable): Boolean =
+        generateSequence(e as Throwable?) { it.cause }
+            .take(MAX_CAUSE_DEPTH)
+            .any { it is StatusRuntimeException || it is java.io.IOException }
+
+    private fun wrapAsUnavailable(
+        op: String,
+        cause: Throwable,
+    ): QdrantUnavailableException {
+        logger.warn("Qdrant {} failed: {}", op, cause.message)
+        return QdrantUnavailableException(
+            message = "Qdrant $op failed: ${cause.message}",
+            cause = cause,
+        )
+    }
 
     // -------------------------------------------------------------------------
     // private helpers
@@ -272,6 +318,7 @@ class QdrantTicketChunkRepository(
         private const val UPSERT_BATCH_SIZE = 32
         private const val MAX_SCROLL_PAGE = 256
         private const val INDEX_TIMEOUT_SECONDS = 10L
+        private const val MAX_CAUSE_DEPTH = 8
         private const val PAYLOAD_TICKET_ID = "ticket_id"
         private const val PAYLOAD_PROJECT_ID = "project_id"
         private const val PAYLOAD_STATUS = "status"

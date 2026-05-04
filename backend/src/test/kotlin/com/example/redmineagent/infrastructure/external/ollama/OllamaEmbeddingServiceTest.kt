@@ -1,6 +1,7 @@
 package com.example.redmineagent.infrastructure.external.ollama
 
 import com.example.redmineagent.application.exception.EmbeddingTooLongException
+import com.example.redmineagent.application.exception.OllamaUnavailableException
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
@@ -76,7 +77,7 @@ class OllamaEmbeddingServiceTest :
             }
         }
 
-        test("HTTP 500 + 他メッセージはそのまま投げる (EmbeddingTooLongException ではない)") {
+        test("HTTP 500 (context length 以外) は OllamaUnavailableException に変換される") {
             server.enqueue(
                 MockResponse()
                     .setResponseCode(500)
@@ -85,7 +86,7 @@ class OllamaEmbeddingServiceTest :
             )
 
             val thrown =
-                shouldThrow<RuntimeException> {
+                shouldThrow<OllamaUnavailableException> {
                     service.embed("anything")
                 }
             (thrown is EmbeddingTooLongException) shouldBe false

@@ -4,13 +4,17 @@ import ai.koog.prompt.dsl.Prompt
 import ai.koog.prompt.executor.ollama.client.OllamaClient
 import ai.koog.prompt.llm.LLModel
 import ai.koog.prompt.streaming.StreamFrame
+import com.example.redmineagent.application.exception.OllamaUnavailableException
 import com.example.redmineagent.domain.gateway.ChatModel
 import com.example.redmineagent.domain.model.ChatMessage
 import com.example.redmineagent.domain.model.ChatRole
 import com.example.redmineagent.domain.model.LlmDelta
+import io.ktor.client.plugins.ResponseException
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.map
+import kotlinx.io.IOException
 import org.springframework.context.annotation.Lazy
 import org.springframework.stereotype.Component
 
@@ -36,6 +40,16 @@ class KoogChatModel(
             .executeStreaming(prompt, ollamaChatLlm, emptyList())
             .filterIsInstance<StreamFrame.TextDelta>()
             .map { LlmDelta(text = it.text) }
+            .catch { e ->
+                // Ktor (Koog OllamaClient 内部) の接続不能 / 5xx を Application 例外に変換
+                if (e is IOException || e is ResponseException) {
+                    throw OllamaUnavailableException(
+                        message = "Ollama chat streaming failed: ${e.message}",
+                        cause = e,
+                    )
+                }
+                throw e
+            }
     }
 
     private fun buildPrompt(messages: List<ChatMessage>): Prompt {
