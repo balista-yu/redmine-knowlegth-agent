@@ -78,7 +78,7 @@ describe("SyncStatusPage", () => {
     });
     expect(screen.getByText("1,247")).toBeInTheDocument();
     // runs テーブルに id=42 が出る
-    expect(screen.getByText("42")).toBeInTheDocument();
+    expect(screen.getByText("#42")).toBeInTheDocument();
   });
 
   it("「今すぐ同期」ボタンを押すと POST /api/sync が呼ばれて refresh される", async () => {

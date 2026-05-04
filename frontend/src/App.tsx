@@ -18,21 +18,33 @@ export function App() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800">
-      <nav className="border-b bg-white px-6 py-3 shadow-sm">
-        <div className="mx-auto flex max-w-4xl items-center gap-4">
-          <strong className="text-base font-semibold">
-            Redmine Knowledge Agent
-          </strong>
-          <NavLink href="#/chat" current={route === "chat"}>
-            Chat
-          </NavLink>
-          <NavLink href="#/admin" current={route === "admin"}>
-            Sync ダッシュボード
-          </NavLink>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/30 to-purple-50/30 text-slate-800">
+      <nav className="sticky top-0 z-10 border-b border-slate-200/70 bg-white/80 shadow-sm backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center gap-4 px-6 py-3">
+          <a href="#/chat" className="flex items-center gap-2">
+            <span
+              aria-hidden
+              className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 text-sm font-bold text-white shadow-sm"
+            >
+              R
+            </span>
+            <strong className="text-base font-semibold tracking-tight">
+              Redmine Knowledge Agent
+            </strong>
+          </a>
+          <div className="ml-auto flex items-center gap-1">
+            <NavLink href="#/chat" current={route === "chat"}>
+              💬 Chat
+            </NavLink>
+            <NavLink href="#/admin" current={route === "admin"}>
+              ⚙ Sync
+            </NavLink>
+          </div>
         </div>
       </nav>
-      {route === "chat" ? <ChatPage /> : <SyncStatusPage />}
+      <div className="mx-auto max-w-6xl">
+        {route === "chat" ? <ChatPage /> : <SyncStatusPage />}
+      </div>
     </div>
   );
 }
@@ -55,8 +67,8 @@ function NavLink({
       href={href}
       className={
         current
-          ? "rounded bg-slate-100 px-2 py-1 text-sm font-medium text-slate-800"
-          : "px-2 py-1 text-sm text-slate-500 hover:text-slate-800"
+          ? "rounded-lg bg-gradient-to-br from-indigo-500/10 to-purple-500/10 px-3 py-1.5 text-sm font-medium text-indigo-700 ring-1 ring-indigo-200"
+          : "rounded-lg px-3 py-1.5 text-sm text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
       }
     >
       {children}
