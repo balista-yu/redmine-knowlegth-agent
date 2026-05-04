@@ -72,9 +72,46 @@ class SyncIssuesApplicationService(
 ## 例外設計
 
 - ユースケース固有の例外は `application/exception/` に置く
-- 例: `SyncAlreadyRunningException`, `EmbeddingTooLongException`
+- 例: `SyncAlreadyRunningException`, `EmbeddingTooLongException`,
+  `OllamaUnavailableException`, `QdrantUnavailableException`
 - Domain で定義された例外は Domain 層に置く
 - Infrastructure の SDK 例外をそのまま投げ上げない (Application 内で必ず変換)
+
+### catch 粒度ポリシー (統一規則)
+
+ApplicationService 内で「想定 SDK 例外を Error イベント等に変換」する場面では:
+
+1. **catch する型は `RuntimeException`** (`Exception` ではない)
+   - Kotlin に checked exception は無い
+   - `Exception` を catch すると `CancellationException` (coroutine 中断) まで吸ってしまう
+2. **type-based dispatch を優先**: 例外の型で `is` 判定して分岐
+   - メッセージ文字列の substring match は SDK バージョン変更で破断するため避ける
+   - 例外型が足りなければ Infrastructure 層で **専用の Application 例外** に変換してから上げる
+3. **`@Suppress("TooGenericExceptionCaught")` は必要なときだけ + コメントで理由明記**
+
+```kotlin
+// ✓ OK
+try {
+    val response = agent.run(message)
+    ...
+} catch (
+    @Suppress("TooGenericExceptionCaught") e: RuntimeException,
+) {
+    emit(toErrorEvent(e))
+}
+
+private fun toErrorEvent(e: RuntimeException): AgentEvent.Error =
+    when (e) {
+        is OllamaUnavailableException -> AgentEvent.Error("OLLAMA_UNAVAILABLE", e.message ?: "")
+        is QdrantUnavailableException -> AgentEvent.Error("QDRANT_UNAVAILABLE", e.message ?: "")
+        else -> AgentEvent.Error("INTERNAL", e.message ?: e::class.java.simpleName)
+    }
+
+// ✗ NG (Exception で受けて message substring で判定)
+try { ... } catch (e: Exception) {
+    if ("ollama" in e.message.orEmpty()) ...   // SDK 変更で簡単に破断
+}
+```
 
 ## テストの書き方
 

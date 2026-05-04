@@ -1,6 +1,8 @@
 package com.example.redmineagent.application.service
 
 import ai.koog.agents.core.agent.AIAgent
+import com.example.redmineagent.application.exception.OllamaUnavailableException
+import com.example.redmineagent.application.exception.QdrantUnavailableException
 import com.example.redmineagent.domain.model.AgentEvent
 import com.example.redmineagent.domain.model.ChatMessage
 import com.example.redmineagent.domain.model.ChatRole
@@ -49,8 +51,8 @@ class AnswerQuestionApplicationServiceTest :
             cidSlot.captured shouldBe cidSlot.captured.lowercase()
         }
 
-        test("Ollama 接続失敗の例外は OLLAMA_UNAVAILABLE Error イベントに変換される") {
-            coEvery { agent.run(any()) } throws RuntimeException("connection refused: ollama unreachable")
+        test("OllamaUnavailableException → OLLAMA_UNAVAILABLE Error イベントに変換される") {
+            coEvery { agent.run(any()) } throws OllamaUnavailableException("ollama unreachable")
 
             val events = service.execute("hello", conversationId = "c-2").toList()
 
@@ -59,7 +61,15 @@ class AnswerQuestionApplicationServiceTest :
             error.code shouldBe "OLLAMA_UNAVAILABLE"
         }
 
-        test("その他例外は INTERNAL Error イベントに変換される") {
+        test("QdrantUnavailableException → QDRANT_UNAVAILABLE Error イベントに変換される") {
+            coEvery { agent.run(any()) } throws QdrantUnavailableException("qdrant down")
+
+            val events = service.execute("hello", conversationId = "c-2q").toList()
+
+            (events.single() as AgentEvent.Error).code shouldBe "QDRANT_UNAVAILABLE"
+        }
+
+        test("その他の RuntimeException は INTERNAL Error イベントに変換される") {
             coEvery { agent.run(any()) } throws RuntimeException("something went wrong")
 
             val events = service.execute("hello", conversationId = "c-3").toList()

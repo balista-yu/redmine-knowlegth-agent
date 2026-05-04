@@ -1,6 +1,7 @@
 package com.example.redmineagent.infrastructure.external.ollama
 
 import com.example.redmineagent.application.exception.EmbeddingTooLongException
+import com.example.redmineagent.application.exception.OllamaUnavailableException
 import com.example.redmineagent.domain.gateway.EmbeddingService
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import kotlinx.coroutines.reactor.awaitSingle
@@ -9,6 +10,7 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.MediaType
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
+import org.springframework.web.reactive.function.client.WebClientRequestException
 import org.springframework.web.reactive.function.client.WebClientResponseException
 
 /**
@@ -52,6 +54,7 @@ class OllamaEmbeddingService(
                     ?: error("Ollama returned no embeddings for input length=${text.length}")
             FloatArray(first.size) { idx -> first[idx].toFloat() }
         } catch (e: RuntimeException) {
+            // 1. context length 超過 → リトライ可能な domain 例外に変換
             if (isContextLengthError(e)) {
                 logger.warn("Ollama context length exceeded for input length={}", text.length)
                 throw EmbeddingTooLongException(
@@ -59,7 +62,27 @@ class OllamaEmbeddingService(
                     cause = e,
                 )
             }
+            // 2. 接続不能 / 5xx (context length 以外) → サービス断として変換
+            //    Application 層は OllamaUnavailableException を `is` 判定できる
+            if (isOllamaUnavailable(e)) {
+                logger.warn("Ollama call failed: {}", e.message)
+                throw OllamaUnavailableException(
+                    message = "Ollama embed failed: ${e.message}",
+                    cause = e,
+                )
+            }
             throw e
+        }
+
+    private fun isOllamaUnavailable(e: Throwable): Boolean =
+        when (e) {
+            // ConnectException 等が cause チェーンに乗る
+            is WebClientRequestException -> true
+
+            // 5xx (context length 判定済みなのでここは純粋な internal error)
+            is WebClientResponseException -> e.statusCode.is5xxServerError
+
+            else -> false
         }
 
     private fun isContextLengthError(e: Throwable): Boolean {
