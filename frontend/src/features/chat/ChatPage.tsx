@@ -100,20 +100,18 @@ export function ChatPage() {
   );
 
   return (
-    <div className="grid min-h-screen grid-cols-1 gap-6 bg-slate-50 px-6 py-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-      <section className="flex flex-col gap-4">
-        <h1 className="text-xl font-semibold text-slate-800">
-          Redmine Knowledge Agent
-        </h1>
+    <div className="grid min-h-[calc(100vh-3.5rem)] grid-cols-1 gap-6 px-6 py-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <section className="flex min-h-0 flex-col gap-4">
         {state.error && (
           <div
             role="alert"
-            className="rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700"
+            className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50/80 px-4 py-2.5 text-sm text-red-700 shadow-sm"
           >
-            {state.error}
+            <span aria-hidden>⚠</span>
+            <span className="leading-relaxed">{state.error}</span>
           </div>
         )}
-        <div className="flex-1 rounded-md bg-slate-100 p-4">
+        <div className="flex-1 overflow-y-auto rounded-2xl bg-gradient-to-br from-slate-50 to-white p-4 ring-1 ring-slate-200/60">
           <MessageList
             messages={state.messages}
             streamingText={state.streamingText}
