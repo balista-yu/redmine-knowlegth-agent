@@ -19,6 +19,7 @@ out/
 **/.gradle/
 **/build/
 hs_err_pid*.log
+.kotlin/
 
 # Frontend (Node / Vite)
 node_modules/
