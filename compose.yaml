@@ -66,7 +66,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: docker
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
-      OLLAMA_LLM_MODEL: ${OLLAMA_LLM_MODEL:-qwen3.5:9b}
+      OLLAMA_LLM_MODEL: ${OLLAMA_LLM_MODEL:-qwen2.5:7b}
       OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-nomic-embed-text}
       REDMINE_BASE_URL: ${REDMINE_BASE_URL:-http://redmine:3000}
       REDMINE_API_KEY: ${REDMINE_API_KEY}

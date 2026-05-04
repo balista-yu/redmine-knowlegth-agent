@@ -19,7 +19,7 @@ import org.springframework.context.annotation.Lazy
  * Koog `AIAgent` 周りの Bean 配線。
  *
  * 構成:
- *  - `ollamaChatLlm`  : チャット用 LLM (`app.ollama.llm-model` で指定。例: qwen3.5:9b)
+ *  - `ollamaChatLlm`  : チャット用 LLM (`app.ollama.llm-model` で指定)
  *  - `promptExecutor` : `SingleLLMPromptExecutor(ollamaClient)` (Koog の標準ラッパー)
  *  - `toolRegistry`   : 空。T-2-2 で `RagSearchTool` を含む `ToolRegistry` に置き換える予定
  *  - `aiAgent`        : `AIAgent<String, String>`。`KoogAgentFactory.build` で構築

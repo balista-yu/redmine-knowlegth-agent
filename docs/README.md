@@ -72,7 +72,7 @@ Redmine のチケットを RAG ナレッジ源とする AI エージェントの
 - [Task](https://taskfile.dev/) (タスクランナー)
 - [Claude Code](https://docs.claude.com/en/docs/claude-code/overview)
 - Ollama (別 repo でセットアップ済み、`http://host.docker.internal:11434` で到達可能)
-  - 必要モデル: LLM 用 (例: `qwen3.5:9b`) + Embed 用 (`nomic-embed-text`)
+  - 必要モデル: LLM 用 (例: `qwen2.5:7b`) + Embed 用 (`nomic-embed-text`)
 
 ### セットアップ
 
