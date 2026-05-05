@@ -2,8 +2,18 @@ package com.example.redmineagent.infrastructure.web
 
 import com.example.redmineagent.application.service.AnswerQuestionApplicationService
 import com.example.redmineagent.domain.model.AgentEvent
+import com.example.redmineagent.infrastructure.web.dto.ApiErrorDto
+import com.example.redmineagent.infrastructure.web.dto.ChatDeltaDto
+import com.example.redmineagent.infrastructure.web.dto.ChatDoneDto
+import com.example.redmineagent.infrastructure.web.dto.ChatErrorDto
 import com.example.redmineagent.infrastructure.web.dto.ChatRequest
+import com.example.redmineagent.infrastructure.web.dto.ChatSourcesDto
 import com.example.redmineagent.infrastructure.web.mapper.toServerSentEvent
+import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.media.Content
+import io.swagger.v3.oas.annotations.media.Schema
+import io.swagger.v3.oas.annotations.responses.ApiResponse
+import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -19,7 +29,7 @@ import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
 
 /**
- * F-04 (チャット応答) の REST API (詳細: docs/03-api-spec.md §1)。
+ * F-04 (チャット応答) の REST API。
  *
  * - POST `/api/chat` (JSON 入力) → SSE で `delta`/`sources`/`done`/`error` を発行
  * - Bean Validation: `message` 1〜4000 文字 (`ChatRequest`)
@@ -28,15 +38,53 @@ import java.util.UUID
  *
  * `conversationId` は省略時にコントローラ側で UUID v4 を採番し、`done` イベントの payload と
  * `Application` への入力の両方で同じ値を使う (採番タイミング: コントローラのほうが早い)。
+ *
+ * SSE のスキーマは `Flow<ServerSentEvent<Any>>` から springdoc が型を引けないため、
+ * `@ApiResponse(content = ...)` で 4 種 (Delta/Sources/Done/Error) を `oneOf` 列挙する。
  */
 @RestController
 @RequestMapping("/api")
+@Tag(name = "chat", description = "チャット (Server-Sent Events) エンドポイント")
 class ChatController(
     @Lazy private val answerQuestion: AnswerQuestionApplicationService,
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
     @PostMapping("/chat", produces = [MediaType.TEXT_EVENT_STREAM_VALUE])
+    @Operation(
+        summary = "エージェントに質問して SSE で回答を受け取る",
+        description = """
+            イベント順序:
+              1. `delta` を 0 回以上 (LLM トークン断片)
+              2. `sources` を 0 〜 1 回 (引用元チケット一覧)
+              3. `done` を 1 回 (正常終了) または `error` を 1 回 (異常終了)
+
+            `conversationId` を省略するとサーバ側で UUID v4 を採番し、`done` イベントに含めて返す。
+        """,
+    )
+    @ApiResponse(
+        responseCode = "200",
+        description = "SSE ストリーム。各イベントの data は下記いずれか",
+        content = [
+            Content(
+                mediaType = MediaType.TEXT_EVENT_STREAM_VALUE,
+                schema =
+                    Schema(
+                        oneOf = [
+                            ChatDeltaDto::class,
+                            ChatSourcesDto::class,
+                            ChatDoneDto::class,
+                            ChatErrorDto::class,
+                        ],
+                    ),
+            ),
+        ],
+    )
+    @ApiResponse(
+        responseCode = "400",
+        description = "message が空 / 4000 文字超過",
+        content = [Content(schema = Schema(implementation = ApiErrorDto::class))],
+    )
     fun chat(
         @Valid @RequestBody request: ChatRequest,
     ): Flow<ServerSentEvent<Any>> {
