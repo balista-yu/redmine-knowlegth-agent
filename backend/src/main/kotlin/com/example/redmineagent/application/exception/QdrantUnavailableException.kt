@@ -8,7 +8,7 @@ package com.example.redmineagent.application.exception
  *
  * `AnswerQuestionApplicationService` がこの型で `is` 判定し
  * `AgentEvent.Error(code = "QDRANT_UNAVAILABLE")` に対応付ける
- * (詳細: docs/03-api-spec.md §6, §1)。
+ * (詳細: docs/openapi.yaml (エラーレスポンス))。
  */
 class QdrantUnavailableException(
     message: String = "Qdrant is unavailable",

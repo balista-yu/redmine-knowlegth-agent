@@ -8,7 +8,7 @@ import {
 } from "../types";
 
 /**
- * `/api/sync/*` エンドポイントの薄い fetch ラッパ (docs/03-api-spec.md §2〜§5)。
+ * `/api/sync/*` エンドポイントの薄い fetch ラッパ (docs/openapi.yaml (sync 系))。
  *
  * - 200 系: JSON デシリアライズして返却
  * - 409 + `SYNC_ALREADY_RUNNING`: `SyncAlreadyRunningError` に変換

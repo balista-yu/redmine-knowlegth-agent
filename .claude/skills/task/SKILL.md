@@ -14,7 +14,7 @@ allowed-tools: Read, Edit, Write, Bash(./gradlew:*), Bash(npm:*), Bash(task:*), 
 
 1. `docs/02-tasks.md` の該当タスクセクション
 2. `docs/01-design.md` のうち、当該タスクが触れる範囲 (アーキテクチャ §6、データモデル §4、シーケンス §5、テスト戦略 §7、実装方針 §8 のうち関連箇所)
-3. `docs/03-api-spec.md` (web 層タスクの場合)
+3. `docs/openapi.yaml` (web 層タスクの場合)
 
 ## 進め方 (この順序を厳守)
 

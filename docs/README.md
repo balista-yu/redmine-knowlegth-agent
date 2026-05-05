@@ -9,7 +9,7 @@ Redmine のチケットを RAG ナレッジ源とする AI エージェントの
 | `README.md` (本ファイル)  | プロジェクト概要・クイックスタート                    |
 | `01-design.md`            | 設計書: アーキテクチャ・データモデル・シーケンス・テスト戦略 |
 | `02-tasks.md`             | タスク分解書: 実装フェーズと粒度の細かいタスク         |
-| `03-api-spec.md`          | API 仕様書: REST エンドポイント・データ契約           |
+| `openapi.yaml`            | REST API 仕様 (springdoc-openapi で自動生成。Swagger UI: http://localhost:8080/swagger-ui.html) |
 | `04-claude-code-guide.md` | Claude Code 利用ガイド: Skills・rules 概要              |
 
 ## Claude Code 連携

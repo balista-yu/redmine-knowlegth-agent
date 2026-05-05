@@ -1,5 +1,5 @@
 /**
- * `/api/sync/*` エンドポイントの DTO 型 (docs/03-api-spec.md §2〜§5)。
+ * `/api/sync/*` エンドポイントの DTO 型 (docs/openapi.yaml (sync 系))。
  */
 
 export type SyncStatus = {
@@ -41,7 +41,7 @@ export type SyncStartedResponse = {
   status: SyncRunStatusValue;
 };
 
-/** 409 Conflict など API 共通エラーレスポンス (docs/03-api-spec.md §6)。 */
+/** 409 Conflict など API 共通エラーレスポンス (docs/openapi.yaml (エラーレスポンス))。 */
 export type ApiError = {
   code: string;
   message: string;

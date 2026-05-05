@@ -12,7 +12,7 @@ import org.springframework.http.codec.ServerSentEvent
 /**
  * Domain `AgentEvent` → SSE フレーム (`ServerSentEvent`) の変換ロジック。
  *
- * SSE イベント名は API 仕様 (docs/03-api-spec.md §1) と完全一致:
+ * SSE イベント名は API 仕様 (docs/openapi.yaml (POST /api/chat)) と完全一致:
  *  - `delta` / `sources` / `done` / `error`
  *
  * `done` イベントには `conversationId` を含めるため、コントローラから値を渡す。

@@ -66,7 +66,7 @@ class AnswerQuestionApplicationService(
         }
 
     /**
-     * Infrastructure 由来の例外型を API エラーコード (docs/03-api-spec.md §1) に振り分ける。
+     * Infrastructure 由来の例外型を API エラーコード (docs/openapi.yaml (POST /api/chat)) に振り分ける。
      * 型ベースのため SDK / メッセージ表記の揺れに依存せず堅牢。
      */
     private fun toErrorEvent(e: RuntimeException): AgentEvent.Error {
