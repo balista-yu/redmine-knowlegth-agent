@@ -207,6 +207,6 @@ task seed-redmine  # 再投入
 | [`docs/01-design.md`](./docs/01-design.md)             | 設計書 (アーキテクチャ・データモデル・シーケンス・テスト戦略) |
 | [`docs/02-tasks.md`](./docs/02-tasks.md)               | タスク分解書                                             |
 | [`docs/openapi.yaml`](./docs/openapi.yaml)             | REST API 仕様 (springdoc-openapi で自動生成)              |
-| [`docs/04-claude-code-guide.md`](./docs/04-claude-code-guide.md) | Claude Code Skills 利用ガイド                  |
+| [`docs/03-claude-code-guide.md`](./docs/03-claude-code-guide.md) | Claude Code Skills 利用ガイド                  |
 | [`scripts/README.md`](./scripts/README.md)             | seed スクリプト手順                                       |
 | [`CLAUDE.md`](./CLAUDE.md)                             | Claude Code 用プロジェクト規約                            |

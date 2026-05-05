@@ -1,4 +1,4 @@
-# Claude Code 利用ガイド (04-claude-code-guide.md)
+# Claude Code 利用ガイド (03-claude-code-guide.md)
 
 本プロジェクトは [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) で実装することを前提に設計されている。本ドキュメントはその使い方をまとめる。
 
