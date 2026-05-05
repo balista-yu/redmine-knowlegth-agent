@@ -9,7 +9,7 @@ import tailwindcss from "@tailwindcss/vite";
 // - dev: localhost:5173 で待ち受け、/api を backend (localhost:8080) にプロキシ
 // - build: dist/ に最小化バンドル出力
 // - test: jsdom 環境 + setup ファイルで @testing-library/jest-dom を有効化
-// docs/03-api-spec.md §8 の CORS 設定が必要なくなるよう dev proxy で同一オリジン化する。
+// CORS 設定が必要なくなるよう dev proxy で同一オリジン化する。
 // =============================================================================
 
 const BACKEND_URL = process.env.VITE_BACKEND_URL ?? "http://localhost:8080";

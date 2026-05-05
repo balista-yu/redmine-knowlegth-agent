@@ -238,7 +238,7 @@
   - `infrastructure/web/SyncController.kt`
   - `infrastructure/web/dto/{SyncStatusDto,SyncRunDto}.kt`
   - `infrastructure/web/mapper/SyncDtoMapper.kt`
-- **エンドポイント**: `03-api-spec.md` §2〜§5 に準拠
+- **エンドポイント**: `docs/openapi.yaml` の sync 系 に準拠
 - **テスト要件 (`@WebMvcTest`)**:
   - POST /api/sync 正常系 → 200 + JSON
   - POST /api/sync (走行中) → 409 + `SYNC_ALREADY_RUNNING`

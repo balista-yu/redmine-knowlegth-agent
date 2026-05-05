@@ -1,0 +1,458 @@
+openapi: 3.1.0
+info:
+  description: |-
+    Redmine のチケットを RAG ナレッジ源とする AI エージェント API。
+
+    - チャット: `/api/chat` (Server-Sent Events で逐次回答)
+    - 同期管理: `/api/sync`, `/api/reconcile`, `/api/sync/status`, `/api/sync/runs`
+
+    SSE のイベント順序など振る舞い契約は `docs/01-design.md` を参照。
+  license:
+    name: Internal
+    url: https://example.com
+  title: Redmine Knowledge Agent API
+  version: 0.1.0
+servers:
+- description: Local development (redmine-knowledge-agent)
+  url: http://localhost:8080
+tags:
+- description: Redmine → Qdrant 同期 / 状態確認
+  name: sync
+- description: チャット (SSE) エンドポイント
+  name: chat
+- description: チャット (Server-Sent Events) エンドポイント
+  name: chat
+paths:
+  /api/chat:
+    post:
+      description: "\n            イベント順序:\n              1. `delta` を 0 回以上 (LLM ト\
+        ークン断片)\n              2. `sources` を 0 〜 1 回 (引用元チケット一覧)\n              3.\
+        \ `done` を 1 回 (正常終了) または `error` を 1 回 (異常終了)\n\n            `conversationId`\
+        \ を省略するとサーバ側で UUID v4 を採番し、`done` イベントに含めて返す。\n        "
+      operationId: chat
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            text/event-stream:
+              schema:
+                oneOf:
+                - $ref: "#/components/schemas/ChatDelta"
+                - $ref: "#/components/schemas/ChatSources"
+                - $ref: "#/components/schemas/ChatDone"
+                - $ref: "#/components/schemas/ChatError"
+          description: SSE ストリーム。各イベントの data は下記いずれか
+        "400":
+          content:
+            text/event-stream:
+              schema:
+                $ref: "#/components/schemas/ApiErrorDto"
+          description: message が空 / 4000 文字超過
+      summary: エージェントに質問して SSE で回答を受け取る
+      tags:
+      - chat
+  /api/reconcile:
+    post:
+      description: Redmine の現存 issue 一覧と Qdrant の保存内容を突き合わせ、削除済みの孤児 chunk を除去する。
+      operationId: startReconcile
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/SyncStartedDto"
+          description: Reconcile run の開始情報
+        "409":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiErrorDto"
+          description: 別の同期が実行中
+      summary: Reconcile を即時実行
+      tags:
+      - sync
+  /api/sync:
+    post:
+      description: Redmine から差分 (incremental) または全件 (full) を取得し Qdrant に upsert する。
+      operationId: startSync
+      parameters:
+      - description: 同期モード
+        in: query
+        name: mode
+        required: false
+        schema:
+          type: string
+          enum:
+          - incremental
+          - full
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/SyncStartedDto"
+          description: 同期 run の開始情報
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiErrorDto"
+          description: mode が 'incremental' / 'full' 以外
+        "409":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiErrorDto"
+          description: 別の同期が実行中
+      summary: 差分同期を即時実行
+      tags:
+      - sync
+  /api/sync/runs:
+    get:
+      description: 直近の sync_run を新しい順で返す。kind 指定で incremental / full / reconcile を絞り込み可能。
+      operationId: listRuns
+      parameters:
+      - description: 取得件数 (1..100)
+        in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      - description: 種別フィルタ
+        in: query
+        name: kind
+        required: false
+        schema:
+          type: string
+          enum:
+          - incremental
+          - full
+          - reconcile
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/SyncRunsResponseDto"
+          description: OK
+      summary: 同期履歴を取得
+      tags:
+      - sync
+  /api/sync/status:
+    get:
+      description: 最終同期時刻 / 最終 Reconcile 時刻 / 走行中フラグ等を返す。
+      operationId: getStatus
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/SyncStatusDto"
+          description: OK
+      summary: 直近の同期状態を取得
+      tags:
+      - sync
+components:
+  schemas:
+    ApiErrorDto:
+      type: object
+      description: 汎用エラーレスポンス (非 SSE エンドポイント共通)
+      properties:
+        code:
+          type: string
+          description: エラーコード
+          enum:
+          - INVALID_REQUEST
+          - NOT_FOUND
+          - SYNC_ALREADY_RUNNING
+          - OLLAMA_UNAVAILABLE
+          - QDRANT_UNAVAILABLE
+          - REDMINE_UNAVAILABLE
+          - INTERNAL
+          example: SYNC_ALREADY_RUNNING
+        currentRunId:
+          type: integer
+          format: int64
+          description: 実行中の sync_run.id (SYNC_ALREADY_RUNNING のときのみ)
+        details:
+          type: object
+          additionalProperties: {}
+          description: 追加情報 (任意)
+        message:
+          type: string
+          description: ユーザー向けメッセージ
+          example: 同期が既に実行中です
+      required:
+      - code
+      - message
+    ChatDelta:
+      type: object
+      description: SSE event=delta の payload。LLM のトークン断片
+      properties:
+        text:
+          type: string
+          description: 回答テキストの断片
+          example: "過去のチケット #128 では..."
+      required:
+      - text
+    ChatDone:
+      type: object
+      description: SSE event=done の payload。正常終了
+      properties:
+        conversationId:
+          type: string
+          description: 会話単位識別子 (採番済み)
+          example: c-2024-04-26-001
+      required:
+      - conversationId
+    ChatError:
+      type: object
+      description: SSE event=error の payload。異常終了
+      properties:
+        code:
+          type: string
+          description: エラーコード
+          example: OLLAMA_UNAVAILABLE
+        message:
+          type: string
+          description: ユーザー向けメッセージ
+          example: Ollama に接続できませんでした
+      required:
+      - code
+      - message
+    ChatRequest:
+      type: object
+      description: POST /api/chat のリクエスト
+      properties:
+        conversationId:
+          type: string
+          description: 会話単位識別子。省略時はサーバ側で UUID v4 を採番する
+          example: c-2024-04-26-001
+        message:
+          type: string
+          description: ユーザーからの質問 (1〜4000 文字)
+          example: SSL 証明書のエラーで過去に対応した事例ある?
+          maxLength: 4000
+          minLength: 1
+      required:
+      - message
+    ChatSources:
+      type: object
+      description: SSE event=sources の payload。引用元チケット一覧
+      properties:
+        items:
+          type: array
+          description: 引用元チケットの配列
+          items:
+            $ref: "#/components/schemas/TicketHit"
+      required:
+      - items
+    SyncRunDto:
+      type: object
+      description: sync_run 1 件分の履歴エントリ
+      properties:
+        chunksSkipped:
+          type: integer
+          format: int32
+          description: 差分なしで skip した chunk 件数
+          example: 6
+        chunksUpserted:
+          type: integer
+          format: int32
+          description: Qdrant に upsert した chunk 件数
+          example: 18
+        errorMessage:
+          type: string
+          description: 失敗時のエラーメッセージ
+        finishedAt:
+          type: string
+          format: date-time
+          description: 終了時刻 (ISO8601)
+        id:
+          type: integer
+          format: int64
+          description: sync_run の ID
+          example: 42
+        kind:
+          type: string
+          description: 種別
+          enum:
+          - incremental
+          - full
+          - reconcile
+          example: incremental
+        startedAt:
+          type: string
+          format: date-time
+          description: 開始時刻 (ISO8601)
+        status:
+          type: string
+          description: 状態
+          enum:
+          - success
+          - failed
+          example: success
+        ticketsDeleted:
+          type: integer
+          format: int32
+          description: Reconcile で削除した ticket 件数
+          example: 0
+        ticketsFetched:
+          type: integer
+          format: int32
+          description: Redmine から取得した issue 件数
+          example: 12
+      required:
+      - chunksSkipped
+      - chunksUpserted
+      - id
+      - kind
+      - startedAt
+      - status
+      - ticketsDeleted
+      - ticketsFetched
+    SyncRunsResponseDto:
+      type: object
+      description: sync_run 履歴のラッパーレスポンス
+      properties:
+        items:
+          type: array
+          description: 履歴エントリの配列 (新しい順)
+          items:
+            $ref: "#/components/schemas/SyncRunDto"
+        total:
+          type: integer
+          format: int32
+          description: items の件数
+          example: 20
+      required:
+      - items
+      - total
+    SyncStartedDto:
+      type: object
+      description: 同期 / Reconcile run 開始レスポンス
+      properties:
+        kind:
+          type: string
+          description: 種別
+          enum:
+          - incremental
+          - full
+          - reconcile
+          example: incremental
+        runId:
+          type: integer
+          format: int64
+          description: sync_run の ID
+          example: 42
+        startedAt:
+          type: string
+          format: date-time
+          description: 開始時刻 (ISO8601)
+          example: 2024-04-26T10:00:00Z
+        status:
+          type: string
+          description: 状態
+          enum:
+          - running
+          - success
+          - failed
+          example: success
+      required:
+      - kind
+      - runId
+      - startedAt
+      - status
+    SyncStatusDto:
+      type: object
+      description: 同期状態のスナップショット
+      properties:
+        currentRunId:
+          type: integer
+          format: int64
+          description: 実行中の run_id
+        currentlyRunning:
+          type: boolean
+          description: 現在同期実行中か
+          example: false
+        lastError:
+          type: string
+          description: 直近のエラーメッセージ
+        lastFullReconcileAt:
+          type: string
+          format: date-time
+          description: 直近 Reconcile 完了時刻
+        lastSyncFinishedAt:
+          type: string
+          format: date-time
+          description: 直近の同期完了時刻
+        lastSyncStartedAt:
+          type: string
+          format: date-time
+          description: 直近の同期開始時刻
+        source:
+          type: string
+          description: ソース名 ('redmine' 固定)
+          example: redmine
+        ticketsTotal:
+          type: integer
+          format: int32
+          description: Qdrant 上のユニーク ticket_id 数
+          example: 1247
+      required:
+      - currentlyRunning
+      - source
+      - ticketsTotal
+    TicketHit:
+      type: object
+      description: RAG ヒットチケット 1 件
+      properties:
+        projectName:
+          type: string
+          description: プロジェクト名
+          example: infra
+        score:
+          type: number
+          format: float
+          description: コサイン類似度 (0.0〜1.0)
+          example: "0.83"
+        snippet:
+          type: string
+          description: ヒットしたチャンクの抜粋 (〜200 文字)
+        status:
+          type: string
+          description: ステータス名
+          example: Closed
+        subject:
+          type: string
+          description: チケット件名
+          example: 本番Webで証明書期限切れ
+        ticketId:
+          type: integer
+          format: int32
+          description: Redmine チケット ID
+          example: 128
+        tracker:
+          type: string
+          description: トラッカー名
+          example: Bug
+        url:
+          type: string
+          description: Redmine 上のチケット URL
+          example: http://localhost:3000/issues/128
+      required:
+      - projectName
+      - score
+      - snippet
+      - status
+      - subject
+      - ticketId
+      - tracker
+      - url

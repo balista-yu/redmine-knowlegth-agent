@@ -48,6 +48,27 @@ management:
       probes:
         enabled: true
 
+# =============================================================================
+# springdoc-openapi
+#   - コードファースト方式: Controller / DTO のアノテーションから OpenAPI を生成
+#   - /v3/api-docs.yaml が canonical なマシン可読契約 (CI で docs/openapi.yaml に commit)
+#   - paths-to-match で /api/** に絞り、actuator 等を仕様から除外する
+#   - packages-to-scan で infrastructure.web に絞り、誤って Domain/Application が
+#     拾われない安全装置にする
+#   - writer-with-order-by-keys=true: 生成 YAML のキー順を固定し PR 差分を安定化
+# =============================================================================
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: ${SPRINGDOC_SWAGGER_UI_ENABLED:true}
+  packages-to-scan: com.example.redmineagent.infrastructure.web
+  paths-to-match: /api/**
+  writer-with-order-by-keys: true
+  writer-with-default-pretty-printer: true
+
 logging:
   level:
     root: INFO

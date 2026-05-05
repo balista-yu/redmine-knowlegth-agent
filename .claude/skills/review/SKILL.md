@@ -19,7 +19,7 @@ allowed-tools: Read, Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash
 4. **テストの質**: 偽陽性・偽陰性を生みやすい assertion になっていないか、実装の鏡写しテストになっていないか
 5. **Clean Code**: マジック値、長すぎる関数 (30 行超)、`!!`、意図不明の命名
 6. **命名・配置**: `docs/01-design.md` §6.4 のディレクトリ構成・命名規約と一致しているか
-7. **API 契約**: web 層の場合、`docs/03-api-spec.md` と一致しているか
+7. **API 契約**: web 層の場合、`docs/openapi.yaml` と一致しているか
 8. **エラーハンドリング**: `docs/01-design.md` §8.5 の方針 (リトライ・例外変換) に従っているか
 
 ## 進め方

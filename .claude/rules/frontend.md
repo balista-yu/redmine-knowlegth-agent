@@ -75,7 +75,7 @@ async function* streamChat(message: string): AsyncGenerator<ChatEvent> {
 }
 ```
 
-API 仕様は `docs/03-api-spec.md` §1 参照。
+API 仕様は `docs/openapi.yaml` の /api/chat 参照。
 
 ## スタイリング (TailwindCSS)
 
@@ -87,7 +87,7 @@ API 仕様は `docs/03-api-spec.md` §1 参照。
 
 - `frontend/src/features/<機能>/api/` または `shared/api/` に集約
 - `fetch` ラッパで `Content-Type: application/json` をデフォルト化
-- エラーハンドリングは API レスポンスの `code` フィールド (例: `OLLAMA_UNAVAILABLE`) で分岐 (`docs/03-api-spec.md` §6 参照)
+- エラーハンドリングは API レスポンスの `code` フィールド (例: `OLLAMA_UNAVAILABLE`) で分岐 (`docs/openapi.yaml` のエラーレスポンス 参照)
 
 ## テスト
 

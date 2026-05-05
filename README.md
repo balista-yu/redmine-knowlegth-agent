@@ -131,7 +131,7 @@ curl http://localhost:8080/api/sync/status  # 状態確認
 
 - フロント Chat: <http://localhost:5173> で質問入力 → 引用付き回答
 - フロント Sync ダッシュボード: <http://localhost:5173/#/admin>
-- API: 詳細は [`docs/03-api-spec.md`](./docs/03-api-spec.md)
+- API: 機械可読仕様 [`docs/openapi.yaml`](./docs/openapi.yaml) / Swagger UI <http://localhost:8080/swagger-ui.html>
 
 ## 主要コマンド
 
@@ -206,7 +206,7 @@ task seed-redmine  # 再投入
 | [`docs/README.md`](./docs/README.md)                   | プロジェクト概要 (詳細版)                                |
 | [`docs/01-design.md`](./docs/01-design.md)             | 設計書 (アーキテクチャ・データモデル・シーケンス・テスト戦略) |
 | [`docs/02-tasks.md`](./docs/02-tasks.md)               | タスク分解書                                             |
-| [`docs/03-api-spec.md`](./docs/03-api-spec.md)         | REST API 仕様 + SSE フォーマット                         |
-| [`docs/04-claude-code-guide.md`](./docs/04-claude-code-guide.md) | Claude Code Skills 利用ガイド                  |
+| [`docs/openapi.yaml`](./docs/openapi.yaml)             | REST API 仕様 (springdoc-openapi で自動生成)              |
+| [`docs/03-claude-code-guide.md`](./docs/03-claude-code-guide.md) | Claude Code Skills 利用ガイド                  |
 | [`scripts/README.md`](./scripts/README.md)             | seed スクリプト手順                                       |
 | [`CLAUDE.md`](./CLAUDE.md)                             | Claude Code 用プロジェクト規約                            |

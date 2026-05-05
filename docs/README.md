@@ -9,8 +9,8 @@ Redmine のチケットを RAG ナレッジ源とする AI エージェントの
 | `README.md` (本ファイル)  | プロジェクト概要・クイックスタート                    |
 | `01-design.md`            | 設計書: アーキテクチャ・データモデル・シーケンス・テスト戦略 |
 | `02-tasks.md`             | タスク分解書: 実装フェーズと粒度の細かいタスク         |
-| `03-api-spec.md`          | API 仕様書: REST エンドポイント・データ契約           |
-| `04-claude-code-guide.md` | Claude Code 利用ガイド: Skills・rules 概要              |
+| `openapi.yaml`            | REST API 仕様 (springdoc-openapi で自動生成。Swagger UI: http://localhost:8080/swagger-ui.html) |
+| `03-claude-code-guide.md` | Claude Code 利用ガイド: Skills・rules 概要              |
 
 ## Claude Code 連携
 
@@ -21,7 +21,7 @@ Redmine のチケットを RAG ナレッジ源とする AI エージェントの
 - `.claude/skills/<name>/SKILL.md`: Skills (`/task`, `/review`, `/fix` 等の明示呼び出し / description マッチで自動起動)
 - `.claude/settings.json`: 権限設定
 
-詳細は `04-claude-code-guide.md` 参照。
+詳細は `03-claude-code-guide.md` 参照。
 
 ## 概要
 
@@ -104,7 +104,7 @@ task up
 /arch-check         # ArchUnit でアーキ違反検査
 ```
 
-詳細は `04-claude-code-guide.md`。
+詳細は `03-claude-code-guide.md`。
 
 ## ディレクトリ構成 (リポジトリ全体)
 

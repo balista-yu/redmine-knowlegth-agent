@@ -55,6 +55,9 @@ object Versions {
     const val TESTCONTAINERS = "2.0.5"
     const val COROUTINES = "1.10.2"
     const val FLYWAY_PG = "12.5.0"
+
+    // springdoc-openapi 3.x は Spring Boot 4.0 系対応 (2.x は Boot 3.x 用)
+    const val SPRINGDOC = "3.0.2"
 }
 
 dependencies {
@@ -64,6 +67,12 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-validation")
+
+    // --- OpenAPI (springdoc) --------------------------------------------------
+    // コードファースト OpenAPI 3.x 仕様生成 + Swagger UI を提供する。
+    // 生成された /v3/api-docs.yaml は GitHub Actions (openapi-sync) で
+    // docs/openapi.yaml に commit される (canonical なマシン可読 API 契約)。
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:${Versions.SPRINGDOC}")
 
     // --- Persistence ----------------------------------------------------------
     // Spring Boot 4.0 では Flyway 自動設定が starter-flyway モジュールに分離された

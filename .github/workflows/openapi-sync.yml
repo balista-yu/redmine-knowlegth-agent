@@ -1,0 +1,176 @@
+# =============================================================================
+# OpenAPI Sync: backend を起動して /v3/api-docs.yaml を docs/openapi.yaml に書き出す
+# =============================================================================
+# トリガ:
+#   - PR (作成 / 更新) : PR ブランチに openapi.yaml の差分を auto-commit (レビュー時に
+#     API 変更が PR diff で見える)
+#   - main への push  : merge 後の確定版を main に反映
+#   - workflow_dispatch: 手動再生成
+#
+# 動作:
+#   1. Postgres + Qdrant を services で起動 (backend が起動時に Flyway / Qdrant 接続を行う)
+#   2. ./gradlew bootJar でアプリビルド
+#   3. ダミー env (Redmine / Ollama 未起動) で backend をバックグラウンド起動
+#      - controllers の AIAgent / RedmineGateway は @Lazy なので起動時に外部接続しない
+#   4. /v3/api-docs.yaml を curl して docs/openapi.yaml に保存
+#   5. stefanzweifel/git-auto-commit-action@v5 で diff があれば commit
+#      - PR イベントでは PR head ブランチに push (checkout で head_ref を指定)
+#      - GITHUB_TOKEN による push は他の workflow を再起動しないため再帰トリガなし
+# =============================================================================
+name: OpenAPI Sync
+
+on:
+  pull_request:
+    paths:
+      - 'backend/src/main/kotlin/com/example/redmineagent/infrastructure/web/**'
+      - 'backend/src/main/kotlin/com/example/redmineagent/infrastructure/config/OpenApiConfig.kt'
+      - 'backend/build.gradle.kts'
+      - '.github/workflows/openapi-sync.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/src/main/kotlin/com/example/redmineagent/infrastructure/web/**'
+      - 'backend/src/main/kotlin/com/example/redmineagent/infrastructure/config/OpenApiConfig.kt'
+      - 'backend/build.gradle.kts'
+      - '.github/workflows/openapi-sync.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: openapi-sync-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  generate:
+    name: Generate docs/openapi.yaml
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: redmineagent
+          POSTGRES_USER: redmineagent
+          POSTGRES_PASSWORD: redmineagent
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U redmineagent -d redmineagent"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      qdrant:
+        image: qdrant/qdrant:latest
+        ports:
+          - 6333:6333
+          - 6334:6334
+        # qdrant イメージには curl/wget が無く健康チェックが書きづらいので
+        # services の health チェックは省略 (起動順は wait-for ロジックでカバー)
+    steps:
+      # PR イベントでは head_ref (PR ブランチ) を checkout する。
+      # PR ブランチに push し直したいので detached HEAD ではなく branch 名で checkout。
+      # push / workflow_dispatch では head_ref が空なのでデフォルト ref が使われる。
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Setup JDK 25 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build bootJar
+        working-directory: backend
+        run: ./gradlew --no-daemon bootJar -x test
+
+      - name: Wait for Qdrant to be ready
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:6333/readyz > /dev/null 2>&1; then
+              echo "Qdrant is ready"
+              exit 0
+            fi
+            echo "Waiting for Qdrant... ($i/30)"
+            sleep 2
+          done
+          echo "Qdrant did not become ready in time"
+          exit 1
+
+      - name: Start backend in background
+        working-directory: backend
+        env:
+          # 必須: Postgres / Qdrant (起動時に接続)
+          APP_DB_URL: jdbc:postgresql://localhost:5432/redmineagent
+          APP_DB_USER: redmineagent
+          APP_DB_PASSWORD: redmineagent
+          QDRANT_HOST: localhost
+          QDRANT_PORT: '6334'
+          QDRANT_COLLECTION: redmine_tickets_openapi_gen
+          # ダミー: Redmine / Ollama (controllers が @Lazy なので起動時には呼ばれない)
+          REDMINE_BASE_URL: http://localhost:9999
+          REDMINE_API_KEY: dummy
+          OLLAMA_BASE_URL: http://localhost:11434
+          OLLAMA_LLM_MODEL: dummy
+          OLLAMA_EMBED_MODEL: dummy
+          # spec 生成専用なので Swagger UI は無効化
+          SPRINGDOC_SWAGGER_UI_ENABLED: 'false'
+          # 同期スケジュールは無効化 (cron 実行が混入しないよう遠い未来へ)
+          SYNC_CRON: '0 0 0 1 1 ?'
+          RECONCILE_CRON: '0 0 0 1 1 ?'
+        run: |
+          nohup java \
+            --enable-native-access=ALL-UNNAMED \
+            --sun-misc-unsafe-memory-access=allow \
+            -jar build/libs/*.jar > /tmp/backend.log 2>&1 &
+          echo $! > /tmp/backend.pid
+          echo "Backend started with PID $(cat /tmp/backend.pid)"
+
+      - name: Wait for /v3/api-docs.yaml
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:8080/v3/api-docs.yaml > /dev/null 2>&1; then
+              echo "OpenAPI endpoint is ready"
+              exit 0
+            fi
+            echo "Waiting for backend... ($i/60)"
+            sleep 2
+          done
+          echo "Backend did not become ready. Last 200 lines of log:"
+          tail -200 /tmp/backend.log
+          exit 1
+
+      - name: Fetch openapi.yaml
+        run: |
+          mkdir -p docs
+          curl -fsS http://localhost:8080/v3/api-docs.yaml -o docs/openapi.yaml
+          echo "--- generated openapi.yaml head ---"
+          head -30 docs/openapi.yaml
+
+      - name: Stop backend
+        if: always()
+        run: |
+          if [ -f /tmp/backend.pid ]; then
+            kill $(cat /tmp/backend.pid) 2>/dev/null || true
+          fi
+
+      - name: Auto-commit docs/openapi.yaml
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: 'docs(api): regenerate openapi.yaml'
+          file_pattern: 'docs/openapi.yaml'
+          commit_user_name: 'github-actions[bot]'
+          commit_user_email: '41898282+github-actions[bot]@users.noreply.github.com'
+
+      - name: Upload backend log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-log
+          path: /tmp/backend.log
+          if-no-files-found: ignore

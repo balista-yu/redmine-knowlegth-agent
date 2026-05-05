@@ -12,8 +12,7 @@ import type {
  * `ChatStreamEvent` の AsyncGenerator として yield する。
  *
  * .claude/rules/frontend.md の推奨パターン (`EventSource` ではなく `fetch` を使う)。
- * SSE 形式は "event: <name>\ndata: <json>\n\n" のフレームを期待する
- * (docs/03-api-spec.md §1 と Spring の `ServerSentEvent` フォーマット)。
+ * SSE 形式は "event: <name>\ndata: <json>\n\n" のフレームを期待する。
  *
  * 多重送信防止は呼び出し側 (`ChatPage`) のボタン disabled で完結するため、
  * AbortSignal は受け取らない (Node 24 の undici fetch が jsdom の AbortSignal を

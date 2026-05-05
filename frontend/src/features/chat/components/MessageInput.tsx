@@ -12,7 +12,7 @@ const MAX_LENGTH = 4000;
  * - `Enter` は改行 (誤送信防止)
  * - `Cmd+Enter` / `Ctrl+Enter` で送信
  * - 「送信」ボタン押下でも送信
- * - 4000 文字制限 (docs/03-api-spec.md §1)
+ * - 4000 文字制限
  */
 export function MessageInput({ disabled, onSubmit }: MessageInputProps) {
   const [text, setText] = useState("");

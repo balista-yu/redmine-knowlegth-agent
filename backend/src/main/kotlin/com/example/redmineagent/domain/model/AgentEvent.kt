@@ -2,7 +2,7 @@ package com.example.redmineagent.domain.model
 
 /**
  * AnswerQuestion ユースケースが SSE 用に発行するイベント。
- * Infrastructure 層 (`ChatController`) で SSE フレームに変換される (`docs/03-api-spec.md` §1)。
+ * Infrastructure 層 (`ChatController`) で SSE フレームに変換される。
  *
  * 並び順: `Delta` ストリーム → `Sources` (1 回) → `Done` 。
  * 異常時は途中で `Error` を発行して終端する。
@@ -21,7 +21,7 @@ sealed class AgentEvent {
     /** 応答ストリームの正常終端。 */
     data object Done : AgentEvent()
 
-    /** 応答ストリームの異常終端。`code` は API 仕様 §1 / §6 のエラーコード。 */
+    /** 応答ストリームの異常終端。 */
     data class Error(
         val code: String,
         val message: String,
