@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 
 /**
- * `SyncController` 関連の例外 → REST レスポンスのマッピング (詳細: docs/openapi.yaml (エラーレスポンス))。
+ * `SyncController` 関連の例外 → REST レスポンスのマッピング。
  *
  * `SyncAlreadyRunningException` → 409 + `code=SYNC_ALREADY_RUNNING` + `currentRunId`。
  * 他のエラー (400 / 500 等) は Spring 標準のハンドラに任せる。

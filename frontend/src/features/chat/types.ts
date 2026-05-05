@@ -1,5 +1,5 @@
 /**
- * `/api/chat` SSE エンドポイントの DTO 型 (docs/openapi.yaml (POST /api/chat))。
+ * `/api/chat` SSE エンドポイントの DTO 型。
  * 受信側 (frontend) では `ChatStreamEvent` で discriminated union 化する。
  */
 
