@@ -2,8 +2,10 @@
 # OpenAPI Sync: backend を起動して /v3/api-docs.yaml を docs/openapi.yaml に書き出す
 # =============================================================================
 # トリガ:
-#   - main への push (PR merge 後の確定版を反映)
-#   - workflow_dispatch (手動再生成)
+#   - PR (作成 / 更新) : PR ブランチに openapi.yaml の差分を auto-commit (レビュー時に
+#     API 変更が PR diff で見える)
+#   - main への push  : merge 後の確定版を main に反映
+#   - workflow_dispatch: 手動再生成
 #
 # 動作:
 #   1. Postgres + Qdrant を services で起動 (backend が起動時に Flyway / Qdrant 接続を行う)
@@ -12,12 +14,18 @@
 #      - controllers の AIAgent / RedmineGateway は @Lazy なので起動時に外部接続しない
 #   4. /v3/api-docs.yaml を curl して docs/openapi.yaml に保存
 #   5. stefanzweifel/git-auto-commit-action@v5 で diff があれば commit
-#
-# 生成された docs/openapi.yaml が canonical なマシン可読 API 契約。
+#      - PR イベントでは PR head ブランチに push (checkout で head_ref を指定)
+#      - GITHUB_TOKEN による push は他の workflow を再起動しないため再帰トリガなし
 # =============================================================================
 name: OpenAPI Sync
 
 on:
+  pull_request:
+    paths:
+      - 'backend/src/main/kotlin/com/example/redmineagent/infrastructure/web/**'
+      - 'backend/src/main/kotlin/com/example/redmineagent/infrastructure/config/OpenApiConfig.kt'
+      - 'backend/build.gradle.kts'
+      - '.github/workflows/openapi-sync.yml'
   push:
     branches: [main]
     paths:
@@ -33,6 +41,7 @@ concurrency:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   generate:
@@ -60,7 +69,12 @@ jobs:
         # qdrant イメージには curl/wget が無く健康チェックが書きづらいので
         # services の health チェックは省略 (起動順は wait-for ロジックでカバー)
     steps:
+      # PR イベントでは head_ref (PR ブランチ) を checkout する。
+      # PR ブランチに push し直したいので detached HEAD ではなく branch 名で checkout。
+      # push / workflow_dispatch では head_ref が空なのでデフォルト ref が使われる。
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
 
       - name: Setup JDK 25 (Temurin)
         uses: actions/setup-java@v4
